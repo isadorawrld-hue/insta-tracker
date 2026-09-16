@@ -188,10 +188,13 @@ function StatusBadge({ account }) {
    ============================================================ */
 function App() {
   const [role, setRole] = useState(sessionStorage.getItem("sa_role") || null);
+  const [vaName, setVaName] = useState(sessionStorage.getItem("sa_va") || null);
   const [settings, setSettings] = useState(null);
   const [models, setModels] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [snaps, setSnaps] = useState([]);
+  const [vas, setVas] = useState([]);
+  const [refs, setRefs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
@@ -214,20 +217,28 @@ function App() {
         return;
       }
     }
-    const [se, mo, ac, sn] = await Promise.all([
+    const [se, mo, ac, sn, va, rf] = await Promise.all([
       db.from("app_settings").select("data").eq("id",1).single(),
       db.from("models").select("*").order("name"),
       db.from("accounts").select("*").order("username"),
       db.from("snapshots").select("account_id,taken_on,followers,following,posts_count,views_30d,reels_30d,likes_30d,comments_30d").gte("taken_on", daysAgoStr(45)).order("taken_on"),
+      db.from("vas").select("*").order("name"),
+      db.from("ref_accounts").select("*").order("username"),
     ]);
     if (se.error||mo.error||ac.error||sn.error) {
-      notify("Erreur de chargement — vérifie la config Supabase en haut du fichier");
+      notify("Erreur de chargement — vérifie la config Supabase");
       console.error(se.error||mo.error||ac.error||sn.error);
+    }
+    if (va.error || rf.error) {
+      notify("Tables VA / références manquantes — lance le script supabase-v2.sql dans Supabase");
+      console.error(va.error || rf.error);
     }
     setSettings(se.data?.data || {});
     setModels(mo.data || []);
     setAccounts(ac.data || []);
     setSnaps(sn.data || []);
+    setVas(va.data || []);
+    setRefs(rf.data || []);
     setLoading(false);
   }
   useEffect(()=>{ loadAll(); }, []);
@@ -238,13 +249,18 @@ function App() {
     else if (pin === String(settings.va_pin)) { setRole("va"); sessionStorage.setItem("sa_role","va"); }
     else notify("PIN incorrect");
   }
-  function logout(){ setRole(null); sessionStorage.removeItem("sa_role"); }
+  function pickVa(name) { setVaName(name); sessionStorage.setItem("sa_va", name); }
+  function logout(){
+    setRole(null); setVaName(null);
+    sessionStorage.removeItem("sa_role"); sessionStorage.removeItem("sa_va");
+  }
 
   if (loading) return <div className="login"><div className="mut">Chargement…</div></div>;
   if (!role) return <Login onSubmit={login} />;
+  if (role === "va" && !vaName) return <PickVa vas={vas.filter(v=>v.active)} onPick={pickVa} logout={logout} />;
   return role === "admin"
-    ? <AdminApp settings={settings} models={models} accounts={accounts} snaps={snaps} reload={loadAll} notify={notify} logout={logout} toast={toast} />
-    : <VaApp models={models} accounts={accounts} snaps={snaps} reload={loadAll} notify={notify} logout={logout} toast={toast} />;
+    ? <AdminApp settings={settings} models={models} accounts={accounts} snaps={snaps} vas={vas} refs={refs} reload={loadAll} notify={notify} logout={logout} toast={toast} />
+    : <VaApp models={models} accounts={accounts} snaps={snaps} refs={refs} vaName={vaName} reload={loadAll} notify={notify} logout={logout} toast={toast} />;
 }
 
 function Login({ onSubmit }) {
@@ -263,14 +279,33 @@ function Login({ onSubmit }) {
   );
 }
 
+function PickVa({ vas, onPick, logout }) {
+  return (
+    <div className="login">
+      <div className="login-box" style={{width:340}}>
+        <h1>Qui es-tu ?</h1>
+        <p>Choisis ton nom pour voir tes comptes</p>
+        {vas.length === 0 &&
+          <div className="mut" style={{fontSize:13,marginBottom:16}}>
+            Aucune VA enregistrée — demande à Awen de t'ajouter dans Réglages.
+          </div>}
+        {vas.map(v=>
+          <button key={v.id} className="btn ghost" style={{width:"100%",marginBottom:8,padding:"11px"}}
+            onClick={()=>onPick(v.name)}>{v.name}</button>)}
+        <button className="btn ghost sm" style={{marginTop:10}} onClick={logout}>← Retour</button>
+      </div>
+    </div>
+  );
+}
+
 /* ============================================================
    FORMULAIRE COMPTE (ajout — commun admin/VA)
    ============================================================ */
-function AddAccountForm({ models, onDone, notify, compact }) {
+function AddAccountForm({ models, vas, onDone, notify, compact, fixedVa }) {
   const [username, setUsername] = useState("");
   const [modelId, setModelId] = useState("");
   const [device, setDevice] = useState("");
-  const [va, setVa] = useState("");
+  const [va, setVa] = useState(fixedVa || "");
   const [startedOn, setStartedOn] = useState(todayStr());
   const [busy, setBusy] = useState(false);
 
@@ -282,7 +317,7 @@ function AddAccountForm({ models, onDone, notify, compact }) {
       username: u,
       model_id: modelId || null,
       device_ref: device || null,
-      va_name: va || null,
+      va_name: (fixedVa || va) || null,
       started_on: startedOn,
     });
     setBusy(false);
@@ -304,7 +339,10 @@ function AddAccountForm({ models, onDone, notify, compact }) {
       <div className="field"><label>Téléphone / device</label>
         <input placeholder="ex : iPhoneX_01" value={device} onChange={e=>setDevice(e.target.value)} /></div>
       {!compact && <div className="field"><label>VA</label>
-        <input placeholder="prénom de la VA" value={va} onChange={e=>setVa(e.target.value)} /></div>}
+        <select value={va} onChange={e=>setVa(e.target.value)}>
+          <option value="">— VA —</option>
+          {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+        </select></div>}
       <div className="field"><label>Créé le</label>
         <input type="date" value={startedOn} onChange={e=>setStartedOn(e.target.value)} /></div>
       <div className="field" style={{display:"flex",alignItems:"flex-end"}}>
@@ -315,19 +353,105 @@ function AddAccountForm({ models, onDone, notify, compact }) {
 }
 
 /* ============================================================
+   COMPTES DE RÉFÉRENCE (warm-up) — vue partagée
+   ============================================================ */
+function RefAccounts({ refs, admin, reload, notify }) {
+  const [market, setMarket] = useState("FR");
+  const [newUser, setNewUser] = useState("");
+  const [newLabel, setNewLabel] = useState("");
+
+  const list = refs.filter(r => r.active && r.market === market);
+
+  async function addRef() {
+    const u = cleanUsername(newUser);
+    if (!u) { notify("Username manquant"); return; }
+    const { error } = await db.from("ref_accounts").insert({ username: u, market, label: newLabel || null });
+    if (error) { notify(error.code==="23505" ? "Déjà dans la liste" : "Erreur : "+error.message); return; }
+    setNewUser(""); setNewLabel(""); notify("Ajouté ✓"); reload();
+  }
+  async function removeRef(r) {
+    if (!confirm(`Retirer @${r.username} de la liste ${r.market} ?`)) return;
+    await db.from("ref_accounts").update({ active:false }).eq("id", r.id);
+    notify("Retiré"); reload();
+  }
+
+  return (
+    <div>
+      <div className="row" style={{marginBottom:14}}>
+        {["FR","US"].map(m =>
+          <button key={m} className={"tab"+(market===m?" on":"")} onClick={()=>setMarket(m)}
+            style={{border:"1px solid var(--border)"}}>
+            Modèles {m} ({refs.filter(r=>r.active && r.market===m).length})
+          </button>)}
+      </div>
+
+      {admin &&
+        <div className="panel">
+          <div className="panel-head"><div className="bar"/><h2>AJOUTER UN COMPTE DE RÉFÉRENCE ({market})</h2></div>
+          <div style={{padding:18}}>
+            <div className="grid2">
+              <div className="field"><label>Username Instagram</label>
+                <input placeholder="@username" value={newUser} onChange={e=>setNewUser(e.target.value)}/></div>
+              <div className="field"><label>Note (optionnel)</label>
+                <input placeholder="ex : gros compte lingerie" value={newLabel} onChange={e=>setNewLabel(e.target.value)}/></div>
+            </div>
+            <button className="btn" style={{marginTop:12}} onClick={addRef}>Ajouter à la liste {market}</button>
+          </div>
+        </div>}
+
+      <div className="panel">
+        <div className="panel-head"><div className="bar"/><h2>À SUIVRE PENDANT LE WARM-UP — {market}</h2>
+          <span className="hint">{list.length} compte(s)</span></div>
+        {list.length === 0 ?
+          <div style={{padding:22,textAlign:"center"}} className="mut">
+            Aucun compte {market} dans la liste pour l'instant.
+          </div> :
+          <table>
+            <thead><tr><th>Compte</th><th className="hide-m">Note</th><th></th></tr></thead>
+            <tbody>
+              {list.map(r=>
+                <tr key={r.id}>
+                  <td><a href={"https://instagram.com/"+r.username} target="_blank" rel="noreferrer">@{r.username}</a></td>
+                  <td className="hide-m mut">{r.label || "—"}</td>
+                  <td className="r">
+                    {admin && <button className="btn danger sm" onClick={()=>removeRef(r)}>Retirer</button>}
+                  </td>
+                </tr>)}
+            </tbody>
+          </table>}
+      </div>
+
+      <div className="mut" style={{fontSize:13,padding:"0 4px"}}>
+        À chaque nouveau compte créé : suivre ces comptes pendant le warm-up, puis scroller leur feed et regarder quelques stories.
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    VUE VA
    ============================================================ */
-function VaApp({ models, accounts, snaps, reload, notify, logout, toast }) {
-  const active = accounts.filter(a=>a.active && a.status!=="supprime");
+function VaApp({ models, accounts, snaps, refs, vaName, reload, notify, logout, toast }) {
+  const [tab, setTab] = useState("comptes");
+
+  const mine = accounts.filter(a => a.active && a.status!=="supprime" && a.va_name === vaName);
+  const withStats = useMemo(()=>mine.map(a=>({ a, st: computeAccountStats(a, snaps) })), [accounts, snaps, vaName]);
+
+  const totals = useMemo(()=>{
+    const act = withStats.filter(x=>x.a.status==="actif");
+    const sum=(f)=>{let t=0,h=false;for(const r of act){const v=f(r);if(v!=null){t+=v;h=true;}}return h?t:null;};
+    return { count: act.length, followers: sum(r=>r.st.latest?.followers), d7: sum(r=>r.st.d7), views: sum(r=>r.st.latest?.views_30d) };
+  },[withStats]);
+
   const byModel = useMemo(()=>{
     const map = {};
-    for (const a of active) {
+    for (const {a, st} of withStats) {
       const m = models.find(x=>x.id===a.model_id);
       const key = m ? m.name : "— sans modèle —";
-      (map[key] = map[key]||[]).push(a);
+      (map[key] = map[key]||[]).push({a, st});
     }
     return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0]));
-  },[accounts,models]);
+  },[withStats, models]);
 
   async function reportBanni(a) {
     if (!confirm(`Marquer @${a.username} comme BANNI ?`)) return;
@@ -338,29 +462,50 @@ function VaApp({ models, accounts, snaps, reload, notify, logout, toast }) {
   return (
     <div>
       <div className="topbar">
-        <div className="brand">Sensual <em>Aura</em> · Tracker</div>
-        <div style={{flex:1}}/>
+        <div className="brand">Sensual <em>Aura</em> · {vaName}</div>
+        <div className="tabs">
+          {[["comptes","Mes comptes"],["refs","Comptes à suivre"]].map(([k,l])=>
+            <button key={k} className={"tab"+(tab===k?" on":"")} onClick={()=>setTab(k)}>{l}</button>)}
+        </div>
         <button className="btn ghost sm" onClick={logout}>Quitter</button>
       </div>
-      <div className="wrap">
-        <div className="panel">
-          <div className="panel-head"><div className="bar"/><h2>AJOUTER UN NOUVEAU COMPTE</h2>
-            <span className="hint">à faire à chaque création de compte</span></div>
-          <div style={{padding:18}}>
-            <AddAccountForm models={models} onDone={reload} notify={notify} compact />
-          </div>
-        </div>
 
-        {byModel.map(([modelName, list]) =>
-          <div className="panel" key={modelName}>
-            <div className="panel-head"><div className="bar"/><h2>{modelName.toUpperCase()}</h2>
-              <span className="hint">{list.length} compte(s)</span></div>
-            <table>
-              <thead><tr><th>Compte</th><th>Statut</th><th className="r">Followers</th><th className="r hide-m">Vues 30 j</th><th></th></tr></thead>
-              <tbody>
-                {list.map(a=>{
-                  const st = computeAccountStats(a, snaps);
-                  return (
+      <div className="wrap">
+        {tab==="refs" && <RefAccounts refs={refs} admin={false} reload={reload} notify={notify} />}
+
+        {tab==="comptes" && <div>
+          <div className="panel">
+            <div className="panel-head"><div className="bar"/><h2>MES CHIFFRES</h2>
+              <span className="hint">uniquement tes comptes</span></div>
+            <table><tbody><tr>
+              <td><span className="mut">Mes comptes actifs</span><div className="num" style={{fontSize:22,fontWeight:700}}>{totals.count}</div></td>
+              <td><span className="mut">Followers cumulés</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.followers)}</div></td>
+              <td><span className="mut">Δ 7 jours</span><div style={{fontSize:22,fontWeight:700}}>{fmtDelta(totals.d7)}</div></td>
+              <td><span className="mut">Vues 30 j</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.views)}</div></td>
+            </tr></tbody></table>
+          </div>
+
+          <div className="panel">
+            <div className="panel-head"><div className="bar"/><h2>AJOUTER UN NOUVEAU COMPTE</h2>
+              <span className="hint">à faire à chaque création de compte</span></div>
+            <div style={{padding:18}}>
+              <AddAccountForm models={models} onDone={reload} notify={notify} fixedVa={vaName} compact />
+            </div>
+          </div>
+
+          {byModel.length === 0 &&
+            <div className="panel"><div style={{padding:26,textAlign:"center"}} className="mut">
+              Aucun compte à ton nom pour l'instant. Ajoute-en un ci-dessus.
+            </div></div>}
+
+          {byModel.map(([modelName, list]) =>
+            <div className="panel" key={modelName}>
+              <div className="panel-head"><div className="bar"/><h2>{modelName.toUpperCase()}</h2>
+                <span className="hint">{list.length} compte(s)</span></div>
+              <table>
+                <thead><tr><th>Compte</th><th>Statut</th><th className="r">Followers</th><th className="r hide-m">Δ 7 j</th><th className="r hide-m">Vues 30 j</th><th></th></tr></thead>
+                <tbody>
+                  {list.map(({a, st})=>
                     <tr key={a.id}>
                       <td>
                         <a href={"https://instagram.com/"+a.username} target="_blank" rel="noreferrer">@{a.username}</a>
@@ -368,18 +513,18 @@ function VaApp({ models, accounts, snaps, reload, notify, logout, toast }) {
                       </td>
                       <td><StatusBadge account={a} /></td>
                       <td className="r num">{fmt(st.latest?.followers)}</td>
+                      <td className="r hide-m">{fmtDelta(st.d7)}</td>
                       <td className="r num hide-m">{fmt(st.latest?.views_30d)}</td>
                       <td className="r">
                         {a.status==="actif" &&
                           <button className="btn danger sm" onClick={()=>reportBanni(a)}>Banni</button>}
                       </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                    </tr>)}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>}
       </div>
       {toast && <div className="toast">{toast}</div>}
     </div>
@@ -389,7 +534,7 @@ function VaApp({ models, accounts, snaps, reload, notify, logout, toast }) {
 /* ============================================================
    VUE ADMIN
    ============================================================ */
-function AdminApp({ settings, models, accounts, snaps, reload, notify, logout, toast }) {
+function AdminApp({ settings, models, accounts, snaps, vas, refs, reload, notify, logout, toast }) {
   const [tab, setTab] = useState("dash");
   const [detail, setDetail] = useState(null);
 
@@ -416,6 +561,26 @@ function AdminApp({ settings, models, accounts, snaps, reload, notify, logout, t
     }).sort((x,y)=>(y.followers||0)-(x.followers||0));
   },[models, withStats]);
 
+  /* --- agrégats par VA --- */
+  const vaRows = useMemo(()=>{
+    const names = new Set(withStats.filter(x=>x.a.va_name).map(x=>x.a.va_name));
+    for (const v of (vas||[])) if (v.active) names.add(v.name);
+    const rows = [...names].map(name=>{
+      const list = withStats.filter(x=>x.a.va_name===name && x.a.status==="actif");
+      const sum = (f)=>{ let t=0,has=false; for(const r of list){ const v=f(r); if(v!=null){t+=v;has=true;} } return has?t:null; };
+      return {
+        name, count: list.length,
+        followers: sum(r=>r.st.latest?.followers),
+        d7: sum(r=>r.st.d7),
+        views: sum(r=>r.st.latest?.views_30d),
+        reels: sum(r=>r.st.latest?.reels_30d),
+        bannis: withStats.filter(x=>x.a.va_name===name && (x.a.status==="banni"||x.a.status==="introuvable")).length,
+      };
+    }).sort((a,b)=>(b.views||0)-(a.views||0));
+    const orphan = withStats.filter(x=>!x.a.va_name && x.a.status==="actif").length;
+    return { rows, orphan };
+  },[withStats, vas]);
+
   const noModel = withStats.filter(x=>!x.a.model_id && x.a.status==="actif").length;
 
   /* --- alertes --- */
@@ -441,27 +606,28 @@ function AdminApp({ settings, models, accounts, snaps, reload, notify, logout, t
       <div className="topbar">
         <div className="brand">Sensual <em>Aura</em> · Tracker</div>
         <div className="tabs">
-          {[["dash","Dashboard"],["comptes","Comptes"],["alertes",`Alertes${alerts.length?` (${alerts.length})`:""}`],["reglages","Réglages"]].map(([k,l])=>
+          {[["dash","Dashboard"],["comptes","Comptes"],["refs","Comptes à suivre"],["alertes",`Alertes${alerts.length?` (${alerts.length})`:""}`],["reglages","Réglages"]].map(([k,l])=>
             <button key={k} className={"tab"+(tab===k?" on":"")} onClick={()=>setTab(k)}>{l}</button>)}
         </div>
         <button className="btn ghost sm" onClick={logout}>Quitter</button>
       </div>
 
       <div className="wrap">
-        {tab==="dash" && <Dashboard modelRows={modelRows} noModel={noModel} withStats={withStats} setDetail={setDetail} models={models} />}
-        {tab==="comptes" && <Comptes withStats={withStats} models={models} setDetail={setDetail} reload={reload} notify={notify} />}
+        {tab==="dash" && <Dashboard modelRows={modelRows} vaRows={vaRows} noModel={noModel} withStats={withStats} setDetail={setDetail} models={models} />}
+        {tab==="comptes" && <Comptes withStats={withStats} models={models} vas={vas} setDetail={setDetail} reload={reload} notify={notify} />}
+        {tab==="refs" && <RefAccounts refs={refs} admin={true} reload={reload} notify={notify} />}
         {tab==="alertes" && <Alertes alerts={alerts} setDetail={setDetail} />}
-        {tab==="reglages" && <Reglages settings={settings} models={models} accounts={accounts} reload={reload} notify={notify} />}
+        {tab==="reglages" && <Reglages settings={settings} models={models} accounts={accounts} vas={vas} reload={reload} notify={notify} />}
       </div>
 
-      {detail && <AccountDetail data={detail} models={models} snaps={snaps} close={()=>setDetail(null)} reload={reload} notify={notify} />}
+      {detail && <AccountDetail data={detail} models={models} vas={vas} snaps={snaps} close={()=>setDetail(null)} reload={reload} notify={notify} />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
 }
 
 /* ---------- Onglet Dashboard ---------- */
-function Dashboard({ modelRows, noModel, withStats, setDetail, models }) {
+function Dashboard({ modelRows, vaRows, noModel, withStats, setDetail, models }) {
   const totals = useMemo(()=>{
     const actifs = withStats.filter(x=>x.a.status==="actif");
     const sum=(f)=>{let t=0,h=false;for(const r of actifs){const v=f(r);if(v!=null){t+=v;h=true;}}return h?t:null;};
@@ -515,6 +681,38 @@ function Dashboard({ modelRows, noModel, withStats, setDetail, models }) {
       </div>
 
       <div className="panel">
+        <div className="panel-head"><div className="bar"/><h2>STATS PAR VA</h2>
+          <span className="hint">performance de chaque VA</span></div>
+        <table>
+          <thead><tr>
+            <th>VA</th><th className="r">Comptes actifs</th><th className="r">Followers</th>
+            <th className="r">Δ 7 j</th><th className="r">Vues 30 j</th>
+            <th className="r hide-m">Reels 30 j</th><th className="r hide-m">Bannis / introuvables</th>
+          </tr></thead>
+          <tbody>
+            {vaRows.rows.length === 0 &&
+              <tr><td colSpan="7" className="mut" style={{fontSize:13}}>
+                Aucune VA enregistrée — ajoute-les dans Réglages.
+              </td></tr>}
+            {vaRows.rows.map(r=>
+              <tr key={r.name}>
+                <td style={{fontWeight:600}}>{r.name}</td>
+                <td className="r num">{r.count}</td>
+                <td className="r num" style={{fontWeight:700}}>{fmt(r.followers)}</td>
+                <td className="r">{fmtDelta(r.d7)}</td>
+                <td className="r num" style={{fontWeight:600}}>{fmt(r.views)}</td>
+                <td className="r num hide-m">{r.reels ?? "—"}</td>
+                <td className="r num hide-m">{r.bannis || "—"}</td>
+              </tr>)}
+            {vaRows.orphan > 0 &&
+              <tr><td colSpan="7" className="mut" style={{fontSize:13}}>
+                ⚠ {vaRows.orphan} compte(s) actif(s) sans VA assignée — onglet Comptes pour les assigner
+              </td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="panel">
         <div className="panel-head"><div className="bar"/><h2>TOP COMPTES (VUES 30 J)</h2></div>
         <table>
           <thead><tr><th>Compte</th><th className="hide-m">Modèle</th><th className="r">Followers</th><th className="r">Vues 30 j</th><th className="r hide-m">Moy./reel</th></tr></thead>
@@ -537,10 +735,11 @@ function Dashboard({ modelRows, noModel, withStats, setDetail, models }) {
 }
 
 /* ---------- Onglet Comptes ---------- */
-function Comptes({ withStats, models, setDetail, reload, notify }) {
+function Comptes({ withStats, models, vas, setDetail, reload, notify }) {
   const [q, setQ] = useState("");
   const [fModel, setFModel] = useState("");
   const [fStatus, setFStatus] = useState("");
+  const [fVa, setFVa] = useState("");
   const [showAdd, setShowAdd] = useState(false);
 
   const list = withStats.filter(({a})=>{
@@ -548,6 +747,8 @@ function Comptes({ withStats, models, setDetail, reload, notify }) {
     if (fModel==="none" && a.model_id) return false;
     if (fModel && fModel!=="none" && a.model_id!==fModel) return false;
     if (fStatus && a.status!==fStatus) return false;
+    if (fVa==="none" && a.va_name) return false;
+    if (fVa && fVa!=="none" && a.va_name!==fVa) return false;
     return true;
   });
 
@@ -557,6 +758,10 @@ function Comptes({ withStats, models, setDetail, reload, notify }) {
   }
   async function setModel(a, model_id) {
     await db.from("accounts").update({ model_id: model_id || null }).eq("id", a.id);
+    reload();
+  }
+  async function setVaOn(a, va_name) {
+    await db.from("accounts").update({ va_name: va_name || null }).eq("id", a.id);
     reload();
   }
 
@@ -573,20 +778,25 @@ function Comptes({ withStats, models, setDetail, reload, notify }) {
           <option value="">Tous statuts</option>
           {Object.entries(STATUS_LABEL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
         </select>
+        <select value={fVa} onChange={e=>setFVa(e.target.value)} style={{maxWidth:160}}>
+          <option value="">Toutes les VA</option>
+          <option value="none">Sans VA</option>
+          {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+        </select>
         <div style={{flex:1}}/>
         <button className="btn" onClick={()=>setShowAdd(!showAdd)}>{showAdd?"Fermer":"+ Ajouter un compte"}</button>
       </div>
 
       {showAdd &&
         <div className="panel"><div style={{padding:18}}>
-          <AddAccountForm models={models} onDone={()=>{reload();}} notify={notify} />
+          <AddAccountForm models={models} vas={vas} onDone={()=>{reload();}} notify={notify} />
         </div></div>}
 
       <div className="panel">
         <div className="panel-head"><div className="bar"/><h2>COMPTES</h2><span className="hint">{list.length} affiché(s) — clic sur la ligne → détail</span></div>
         <table>
           <thead><tr>
-            <th>Compte</th><th>Modèle</th><th>Statut</th>
+            <th>Compte</th><th>Modèle</th><th className="hide-m">VA</th><th>Statut</th>
             <th className="r">Followers</th><th className="r hide-m">Δ 7 j</th>
             <th className="r">Vues 30 j</th><th className="hide-m">Note</th><th className="hide-m">Créé</th>
           </tr></thead>
@@ -599,6 +809,11 @@ function Comptes({ withStats, models, setDetail, reload, notify }) {
                   <select value={a.model_id||""} onChange={e=>setModel(a, e.target.value)} style={{padding:"5px 8px",fontSize:13,width:130}}>
                     <option value="">— modèle —</option>
                     {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select></td>
+                <td className="hide-m" onClick={e=>e.stopPropagation()}>
+                  <select value={a.va_name||""} onChange={e=>setVaOn(a, e.target.value)} style={{padding:"5px 8px",fontSize:13,width:120}}>
+                    <option value="">— VA —</option>
+                    {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
                   </select></td>
                 <td><StatusBadge account={a}/></td>
                 <td className="r num">{fmt(st.latest?.followers)}</td>
@@ -635,7 +850,7 @@ function Alertes({ alerts, setDetail }) {
 }
 
 /* ---------- Détail compte (modal) ---------- */
-function AccountDetail({ data, models, snaps, close, reload, notify }) {
+function AccountDetail({ data, models, vas, snaps, close, reload, notify }) {
   const a = data.a;
   const st = data.st || computeAccountStats(a, snaps);
   const [edit, setEdit] = useState({
@@ -689,7 +904,10 @@ function AccountDetail({ data, models, snaps, close, reload, notify }) {
           <div className="field"><label>Device</label>
             <input value={edit.device_ref} onChange={e=>setEdit({...edit,device_ref:e.target.value})}/></div>
           <div className="field"><label>VA</label>
-            <input value={edit.va_name} onChange={e=>setEdit({...edit,va_name:e.target.value})}/></div>
+            <select value={edit.va_name} onChange={e=>setEdit({...edit,va_name:e.target.value})}>
+              <option value="">— VA —</option>
+              {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+            </select></div>
           <div className="field"><label>Créé le</label>
             <input type="date" value={edit.started_on} onChange={e=>setEdit({...edit,started_on:e.target.value})}/></div>
           <div className="field"><label>Notes</label>
@@ -707,11 +925,12 @@ function AccountDetail({ data, models, snaps, close, reload, notify }) {
 }
 
 /* ---------- Onglet Réglages ---------- */
-function Reglages({ settings, models, accounts, reload, notify }) {
+function Reglages({ settings, models, accounts, vas, reload, notify }) {
   const [adminPin, setAdminPin] = useState(String(settings.admin_pin||""));
   const [vaPin, setVaPin] = useState(String(settings.va_pin||""));
   const [seuil, setSeuil] = useState(String(settings.seuil_vues||500));
   const [newModel, setNewModel] = useState("");
+  const [newVa, setNewVa] = useState("");
   const [scanBusy, setScanBusy] = useState(false);
   const [log, setLog] = useState([]);
 
@@ -737,6 +956,25 @@ function Reglages({ settings, models, accounts, reload, notify }) {
     await db.from("models").update({ active: !m.active }).eq("id", m.id);
     reload();
   }
+  async function addVa() {
+    const name = newVa.trim();
+    if (!name) return;
+    const { error } = await db.from("vas").insert({ name });
+    if (error) notify(error.code==="23505" ? "Cette VA existe déjà" : "Erreur : "+error.message);
+    else { setNewVa(""); notify("VA ajoutée ✓"); reload(); }
+  }
+  async function toggleVa(v) {
+    await db.from("vas").update({ active: !v.active }).eq("id", v.id);
+    reload();
+  }
+  async function renameVa(v) {
+    const name = prompt("Nouveau nom :", v.name);
+    if (!name || !name.trim()) return;
+    await db.from("vas").update({ name: name.trim() }).eq("id", v.id);
+    await db.from("accounts").update({ va_name: name.trim() }).eq("va_name", v.name);
+    notify("Renommée ✓"); reload();
+  }
+
   async function renameModel(m) {
     const name = prompt("Nouveau nom :", m.name);
     if (!name || !name.trim()) return;
@@ -788,6 +1026,27 @@ function Reglages({ settings, models, accounts, reload, notify }) {
                   {accounts.filter(a=>a.model_id===m.id && a.active).length} compte(s)</span></div>
               <button className="btn ghost sm" onClick={()=>renameModel(m)}>Renommer</button>
               <button className="btn ghost sm" onClick={()=>toggleModel(m)}>{m.active?"Désactiver":"Réactiver"}</button>
+            </div>)}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-head"><div className="bar"/><h2>VA (ASSISTANTES)</h2>
+          <span className="hint">chacune choisit son nom à la connexion</span></div>
+        <div style={{padding:18}}>
+          <div className="row" style={{marginBottom:12}}>
+            <input placeholder="Prénom de la VA" value={newVa} onChange={e=>setNewVa(e.target.value)} style={{maxWidth:240}}/>
+            <button className="btn" onClick={addVa}>Ajouter</button>
+          </div>
+          {(vas||[]).length === 0 &&
+            <div className="mut" style={{fontSize:13}}>Aucune VA enregistrée pour l'instant.</div>}
+          {(vas||[]).map(v=>
+            <div className="row" key={v.id} style={{padding:"7px 0",borderBottom:"1px solid var(--border)"}}>
+              <div style={{flex:1,opacity:v.active?1:.45}}>{v.name}
+                <span className="mut" style={{fontSize:12,marginLeft:8}}>
+                  {accounts.filter(a=>a.va_name===v.name && a.active).length} compte(s)</span></div>
+              <button className="btn ghost sm" onClick={()=>renameVa(v)}>Renommer</button>
+              <button className="btn ghost sm" onClick={()=>toggleVa(v)}>{v.active?"Désactiver":"Réactiver"}</button>
             </div>)}
         </div>
       </div>
