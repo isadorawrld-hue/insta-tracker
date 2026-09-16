@@ -1,0 +1,9 @@
+[build]
+  publish = "public"
+
+[functions]
+  directory = "netlify/functions"
+
+# Scan chaque nuit à 21:00 UTC = 04:00 Bangkok
+[functions."scrape-nightly"]
+  schedule = "0 21 * * *"
