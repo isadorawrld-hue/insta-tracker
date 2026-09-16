@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sensual Aura — Tracker Insta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+  :root{
+    --bg:#0C0C0F; --panel:#141419; --panel2:#1A1A21; --border:#26262F;
+    --text:#E9E7E2; --muted:#8E8D98; --gold:#E3A94E; --gold-soft:rgba(227,169,78,.12);
+    --green:#46C97E; --red:#E5636B; --orange:#E89A5B; --gray:#6B6B76;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--text);font-family:'Instrument Sans',system-ui,sans-serif;font-size:15px}
+  body{min-height:100vh}
+  input,select,textarea,button{font-family:inherit;font-size:inherit;color:inherit}
+  input,select,textarea{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;outline:none;width:100%}
+  input:focus,select:focus,textarea:focus{border-color:var(--gold)}
+  button{cursor:pointer;border:none;background:none}
+  .num{font-variant-numeric:tabular-nums}
+  a{color:var(--gold);text-decoration:none}
+
+  .topbar{display:flex;align-items:center;gap:20px;padding:14px 22px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,15,.92);backdrop-filter:blur(8px);z-index:20}
+  .brand{font-weight:700;letter-spacing:.3px}
+  .brand em{color:var(--gold);font-style:normal}
+  .tabs{display:flex;gap:4px;flex:1}
+  .tab{padding:8px 14px;border-radius:8px;color:var(--muted);font-weight:500}
+  .tab:hover{color:var(--text)}
+  .tab.on{background:var(--gold-soft);color:var(--gold)}
+  .wrap{max-width:1240px;margin:0 auto;padding:22px}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px}
+  .panel-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)}
+  .panel-head .bar{width:4px;height:16px;background:var(--gold);border-radius:2px}
+  .panel-head h2{font-size:14px;font-weight:600;letter-spacing:.6px;flex:1}
+  .panel-head .hint{color:var(--muted);font-size:12.5px}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11.5px;font-weight:600;letter-spacing:.8px;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border)}
+  th.r,td.r{text-align:right}
+  td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr.click{cursor:pointer}
+  tr.click:hover td{background:var(--panel2)}
+
+  .badge{display:inline-block;padding:3px 9px;border-radius:6px;font-size:12px;font-weight:600}
+  .b-actif{background:rgba(70,201,126,.14);color:var(--green)}
+  .b-banni{background:rgba(229,99,107,.16);color:var(--red)}
+  .b-introuvable{background:rgba(232,154,91,.15);color:var(--orange)}
+  .b-supprime{background:rgba(107,107,118,.18);color:var(--gray)}
+  .pos{color:var(--green)} .neg{color:var(--red)} .mut{color:var(--muted)}
+
+  .btn{background:var(--gold);color:#141419;font-weight:600;padding:9px 16px;border-radius:8px}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+  .btn.danger{background:rgba(229,99,107,.16);color:var(--red)}
+  .btn.sm{padding:6px 11px;font-size:13px;border-radius:7px}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+  .stars button{color:#3A3A44;font-size:16px;padding:0 1px}
+  .stars button.on{color:var(--gold)}
+
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow-y:auto}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:16px;width:100%;max-width:640px;padding:22px}
+
+  .login{min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .login-box{width:320px;text-align:center}
+  .login-box h1{font-size:22px;margin-bottom:6px}
+  .login-box p{color:var(--muted);margin-bottom:22px}
+  .login-box input{text-align:center;font-size:22px;letter-spacing:8px}
+
+  .alert-line{display:flex;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border)}
+  .alert-line:last-child{border-bottom:none}
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--border);padding:11px 18px;border-radius:10px;z-index:100}
+  @media(max-width:760px){
+    .grid2{grid-template-columns:1fr}
+    .wrap{padding:14px}
+    .hide-m{display:none}
+    th,td{padding:9px 8px}
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+/* ============================================================
+   CONFIGURATION — colle ici les 2 valeurs de ton projet Supabase
+   (Supabase > Settings > API)
+   ============================================================ */
+const SUPABASE_URL = "COLLE_ICI_TON_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "COLLE_ICI_TA_CLE_ANON";
+/* ============================================================ */
+
+const { useState, useEffect, useMemo, useRef } = React;
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ---------- Helpers ---------- */
+const todayStr = () => new Date().toISOString().slice(0,10);
+const daysAgoStr = (n) => new Date(Date.now() - n*86400000).toISOString().slice(0,10);
+const fmt = (n) => {
+  if (n === null || n === undefined) return "—";
+  if (Math.abs(n) >= 1e6) return (n/1e6).toFixed(1).replace(".",",") + " M";
+  if (Math.abs(n) >= 1e4) return (n/1e3).toFixed(1).replace(".",",") + " k";
+  return String(n);
+};
+const fmtDelta = (n) => {
+  if (n === null || n === undefined) return <span className="mut">—</span>;
+  if (n > 0) return <span className="pos num">+{fmt(n)}</span>;
+  if (n < 0) return <span className="neg num">{fmt(n)}</span>;
+  return <span className="mut num">±0</span>;
+};
+const fmtDate = (d) => {
+  if (!d) return "—";
+  const [y,m,dd] = d.split("-");
+  return `${dd}/${m}`;
+};
+const ageDays = (d) => Math.floor((Date.now() - new Date(d+"T00:00:00").getTime())/86400000);
+const cleanUsername = (u) => u.trim().replace(/^@/,"").replace(/\s+/g,"").toLowerCase();
+
+const STATUS_LABEL = { actif:"Actif", introuvable:"Introuvable", banni:"Banni", supprime:"Supprimé" };
+
+/* ---------- Calculs par compte ---------- */
+function computeAccountStats(account, snaps) {
+  const s = snaps.filter(x => x.account_id === account.id).sort((a,b)=>a.taken_on<b.taken_on?-1:1);
+  const latest = s[s.length-1] || null;
+  const at = (nDays) => {
+    const target = daysAgoStr(nDays);
+    let best = null;
+    for (const x of s) { if (x.taken_on <= target) best = x; }
+    return best || (s.length > 1 ? s[0] : null);
+  };
+  const s7 = at(7), s30 = at(30);
+  const d7  = (latest && s7 && s7 !== latest && latest.followers!=null && s7.followers!=null) ? latest.followers - s7.followers : null;
+  const d30 = (latest && s30 && s30 !== latest && latest.followers!=null && s30.followers!=null) ? latest.followers - s30.followers : null;
+  const avgViews = (latest && latest.views_30d!=null && latest.reels_30d > 0) ? Math.round(latest.views_30d / latest.reels_30d) : null;
+  const engagement = (latest && latest.followers > 0 && (latest.likes_30d || latest.comments_30d))
+    ? ((latest.likes_30d + latest.comments_30d) / latest.followers) * 100 : null;
+  return { latest, d7, d30, avgViews, engagement, series: s };
+}
+
+/* ---------- Sparkline SVG ---------- */
+function Sparkline({ series }) {
+  const pts = series.filter(s=>s.followers!=null).map(s=>s.followers);
+  if (pts.length < 2) return <div className="mut" style={{fontSize:13}}>Pas encore assez de relevés pour une courbe.</div>;
+  const w=560,h=120,pad=6;
+  const min=Math.min(...pts), max=Math.max(...pts), span=(max-min)||1;
+  const step=(w-pad*2)/(pts.length-1);
+  const d=pts.map((v,i)=>`${i?"L":"M"}${(pad+i*step).toFixed(1)},${(h-pad-((v-min)/span)*(h-pad*2)).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} style={{width:"100%",height:120,display:"block"}}>
+      <path d={d} fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <text x={pad} y={12} fill="var(--muted)" fontSize="11" className="num">{fmt(max)}</text>
+      <text x={pad} y={h-2} fill="var(--muted)" fontSize="11" className="num">{fmt(min)}</text>
+    </svg>
+  );
+}
+
+function Stars({ value, onChange }) {
+  return (
+    <span className="stars">
+      {[1,2,3,4,5].map(i =>
+        <button key={i} className={i<=value?"on":""} onClick={(e)=>{e.stopPropagation(); onChange && onChange(i===value?0:i);}}>★</button>
+      )}
+    </span>
+  );
+}
+
+function StatusBadge({ account }) {
+  return (
+    <span>
+      <span className={"badge b-"+account.status}>{STATUS_LABEL[account.status]||account.status}</span>
+      {account.status!=="actif" && account.status_changed_on &&
+        <span className="mut" style={{fontSize:11.5,marginLeft:6}}>{fmtDate(account.status_changed_on)}</span>}
+    </span>
+  );
+}
+
+/* ============================================================
+   APP
+   ============================================================ */
+function App() {
+  const [role, setRole] = useState(sessionStorage.getItem("sa_role") || null);
+  const [settings, setSettings] = useState(null);
+  const [models, setModels] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [snaps, setSnaps] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
+
+  const notify = (m) => { setToast(m); setTimeout(()=>setToast(null), 3500); };
+
+  async function loadAll() {
+    setLoading(true);
+    const [se, mo, ac, sn] = await Promise.all([
+      db.from("app_settings").select("data").eq("id",1).single(),
+      db.from("models").select("*").order("name"),
+      db.from("accounts").select("*").order("username"),
+      db.from("snapshots").select("account_id,taken_on,followers,following,posts_count,views_30d,reels_30d,likes_30d,comments_30d").gte("taken_on", daysAgoStr(45)).order("taken_on"),
+    ]);
+    if (se.error||mo.error||ac.error||sn.error) {
+      notify("Erreur de chargement — vérifie la config Supabase en haut du fichier");
+      console.error(se.error||mo.error||ac.error||sn.error);
+    }
+    setSettings(se.data?.data || {});
+    setModels(mo.data || []);
+    setAccounts(ac.data || []);
+    setSnaps(sn.data || []);
+    setLoading(false);
+  }
+  useEffect(()=>{ loadAll(); }, []);
+
+  function login(pin) {
+    if (!settings) return;
+    if (pin === String(settings.admin_pin)) { setRole("admin"); sessionStorage.setItem("sa_role","admin"); }
+    else if (pin === String(settings.va_pin)) { setRole("va"); sessionStorage.setItem("sa_role","va"); }
+    else notify("PIN incorrect");
+  }
+  function logout(){ setRole(null); sessionStorage.removeItem("sa_role"); }
+
+  if (loading) return <div className="login"><div className="mut">Chargement…</div></div>;
+  if (!role) return <Login onSubmit={login} />;
+  return role === "admin"
+    ? <AdminApp settings={settings} models={models} accounts={accounts} snaps={snaps} reload={loadAll} notify={notify} logout={logout} toast={toast} />
+    : <VaApp models={models} accounts={accounts} snaps={snaps} reload={loadAll} notify={notify} logout={logout} toast={toast} />;
+}
+
+function Login({ onSubmit }) {
+  const [pin, setPin] = useState("");
+  return (
+    <div className="login">
+      <div className="login-box">
+        <h1>Sensual <em style={{color:"var(--gold)",fontStyle:"normal"}}>Aura</em></h1>
+        <p>Tracker Instagram — entre ton PIN</p>
+        <input type="password" inputMode="numeric" autoFocus value={pin}
+          onChange={e=>setPin(e.target.value)}
+          onKeyDown={e=>{ if(e.key==="Enter") onSubmit(pin); }} />
+        <button className="btn" style={{marginTop:14,width:"100%"}} onClick={()=>onSubmit(pin)}>Entrer</button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   FORMULAIRE COMPTE (ajout — commun admin/VA)
+   ============================================================ */
+function AddAccountForm({ models, onDone, notify, compact }) {
+  const [username, setUsername] = useState("");
+  const [modelId, setModelId] = useState("");
+  const [device, setDevice] = useState("");
+  const [va, setVa] = useState("");
+  const [startedOn, setStartedOn] = useState(todayStr());
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    const u = cleanUsername(username);
+    if (!u) { notify("Username manquant"); return; }
+    setBusy(true);
+    const { error } = await db.from("accounts").insert({
+      username: u,
+      model_id: modelId || null,
+      device_ref: device || null,
+      va_name: va || null,
+      started_on: startedOn,
+    });
+    setBusy(false);
+    if (error) { notify(error.code==="23505" ? "Ce compte existe déjà" : "Erreur : "+error.message); return; }
+    setUsername(""); setDevice("");
+    notify("Compte ajouté ✓ — il sera relevé au prochain scan");
+    onDone && onDone();
+  }
+
+  return (
+    <div className="grid2">
+      <div className="field"><label>Username Instagram</label>
+        <input placeholder="@username" value={username} onChange={e=>setUsername(e.target.value)} /></div>
+      <div className="field"><label>Modèle</label>
+        <select value={modelId} onChange={e=>setModelId(e.target.value)}>
+          <option value="">— modèle —</option>
+          {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+        </select></div>
+      <div className="field"><label>Téléphone / device</label>
+        <input placeholder="ex : iPhoneX_01" value={device} onChange={e=>setDevice(e.target.value)} /></div>
+      {!compact && <div className="field"><label>VA</label>
+        <input placeholder="prénom de la VA" value={va} onChange={e=>setVa(e.target.value)} /></div>}
+      <div className="field"><label>Créé le</label>
+        <input type="date" value={startedOn} onChange={e=>setStartedOn(e.target.value)} /></div>
+      <div className="field" style={{display:"flex",alignItems:"flex-end"}}>
+        <button className="btn" disabled={busy} onClick={save} style={{width:"100%"}}>
+          {busy ? "…" : "Ajouter le compte"}</button></div>
+    </div>
+  );
+}
+
+/* ============================================================
+   VUE VA
+   ============================================================ */
+function VaApp({ models, accounts, snaps, reload, notify, logout, toast }) {
+  const active = accounts.filter(a=>a.active && a.status!=="supprime");
+  const byModel = useMemo(()=>{
+    const map = {};
+    for (const a of active) {
+      const m = models.find(x=>x.id===a.model_id);
+      const key = m ? m.name : "— sans modèle —";
+      (map[key] = map[key]||[]).push(a);
+    }
+    return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0]));
+  },[accounts,models]);
+
+  async function reportBanni(a) {
+    if (!confirm(`Marquer @${a.username} comme BANNI ?`)) return;
+    const { error } = await db.from("accounts").update({ status:"banni", status_changed_on: todayStr() }).eq("id", a.id);
+    if (error) notify("Erreur : "+error.message); else { notify("Signalé — Awen validera la suppression"); reload(); }
+  }
+
+  return (
+    <div>
+      <div className="topbar">
+        <div className="brand">Sensual <em>Aura</em> · Tracker</div>
+        <div style={{flex:1}}/>
+        <button className="btn ghost sm" onClick={logout}>Quitter</button>
+      </div>
+      <div className="wrap">
+        <div className="panel">
+          <div className="panel-head"><div className="bar"/><h2>AJOUTER UN NOUVEAU COMPTE</h2>
+            <span className="hint">à faire à chaque création de compte</span></div>
+          <div style={{padding:18}}>
+            <AddAccountForm models={models} onDone={reload} notify={notify} compact />
+          </div>
+        </div>
+
+        {byModel.map(([modelName, list]) =>
+          <div className="panel" key={modelName}>
+            <div className="panel-head"><div className="bar"/><h2>{modelName.toUpperCase()}</h2>
+              <span className="hint">{list.length} compte(s)</span></div>
+            <table>
+              <thead><tr><th>Compte</th><th>Statut</th><th className="r">Followers</th><th className="r hide-m">Vues 30 j</th><th></th></tr></thead>
+              <tbody>
+                {list.map(a=>{
+                  const st = computeAccountStats(a, snaps);
+                  return (
+                    <tr key={a.id}>
+                      <td>
+                        <a href={"https://instagram.com/"+a.username} target="_blank" rel="noreferrer">@{a.username}</a>
+                        {a.device_ref && <span className="mut" style={{fontSize:12,marginLeft:8}}>{a.device_ref}</span>}
+                      </td>
+                      <td><StatusBadge account={a} /></td>
+                      <td className="r num">{fmt(st.latest?.followers)}</td>
+                      <td className="r num hide-m">{fmt(st.latest?.views_30d)}</td>
+                      <td className="r">
+                        {a.status==="actif" &&
+                          <button className="btn danger sm" onClick={()=>reportBanni(a)}>Banni</button>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+/* ============================================================
+   VUE ADMIN
+   ============================================================ */
+function AdminApp({ settings, models, accounts, snaps, reload, notify, logout, toast }) {
+  const [tab, setTab] = useState("dash");
+  const [detail, setDetail] = useState(null);
+
+  const seuil = Number(settings.seuil_vues || 500);
+  const visible = accounts.filter(a=>a.active);
+  const withStats = useMemo(()=>visible.map(a=>({ a, st: computeAccountStats(a, snaps) })), [accounts, snaps]);
+
+  /* --- agrégats par modèle (comme le tableau STATS PAR MODÈLE) --- */
+  const modelRows = useMemo(()=>{
+    return models.filter(m=>m.active).map(m=>{
+      const rows = withStats.filter(x=>x.a.model_id===m.id && x.a.status==="actif");
+      const sum = (f)=>{ let t=0,has=false; for(const r of rows){ const v=f(r); if(v!=null){t+=v;has=true;} } return has?t:null; };
+      const followers = sum(r=>r.st.latest?.followers);
+      const likes = sum(r=>r.st.latest?.likes_30d) || 0;
+      const comments = sum(r=>r.st.latest?.comments_30d) || 0;
+      return {
+        model: m, count: rows.length,
+        followers,
+        d7: sum(r=>r.st.d7), d30: sum(r=>r.st.d30),
+        views: sum(r=>r.st.latest?.views_30d),
+        reels: sum(r=>r.st.latest?.reels_30d),
+        engagement: followers > 0 ? ((likes+comments)/followers)*100 : null,
+      };
+    }).sort((x,y)=>(y.followers||0)-(x.followers||0));
+  },[models, withStats]);
+
+  const noModel = withStats.filter(x=>!x.a.model_id && x.a.status==="actif").length;
+
+  /* --- alertes --- */
+  const alerts = useMemo(()=>{
+    const out = [];
+    for (const {a, st} of withStats) {
+      if (a.status === "introuvable")
+        out.push({ type:"introuvable", a, txt:`Introuvable depuis le ${fmtDate(a.status_changed_on)} — banni probable, à vérifier` });
+      if (a.status === "banni")
+        out.push({ type:"banni", a, txt:`Banni — à supprimer du téléphone puis archiver ici` });
+      if (a.status === "actif" && ageDays(a.started_on) >= 14) {
+        if (st.avgViews !== null && st.avgViews < seuil)
+          out.push({ type:"eval", a, txt:`${ageDays(a.started_on)} j — moyenne ${fmt(st.avgViews)} vues/reel (seuil ${fmt(seuil)}) → à supprimer et refaire ?` });
+      }
+      if (a.status === "actif" && ageDays(a.started_on) >= 7 && st.latest && st.latest.reels_30d === 0)
+        out.push({ type:"inactif", a, txt:`Aucun reel détecté sur 30 j — la VA poste bien sur ce compte ?` });
+    }
+    return out;
+  },[withStats, seuil]);
+
+  return (
+    <div>
+      <div className="topbar">
+        <div className="brand">Sensual <em>Aura</em> · Tracker</div>
+        <div className="tabs">
+          {[["dash","Dashboard"],["comptes","Comptes"],["alertes",`Alertes${alerts.length?` (${alerts.length})`:""}`],["reglages","Réglages"]].map(([k,l])=>
+            <button key={k} className={"tab"+(tab===k?" on":"")} onClick={()=>setTab(k)}>{l}</button>)}
+        </div>
+        <button className="btn ghost sm" onClick={logout}>Quitter</button>
+      </div>
+
+      <div className="wrap">
+        {tab==="dash" && <Dashboard modelRows={modelRows} noModel={noModel} withStats={withStats} setDetail={setDetail} models={models} />}
+        {tab==="comptes" && <Comptes withStats={withStats} models={models} setDetail={setDetail} reload={reload} notify={notify} />}
+        {tab==="alertes" && <Alertes alerts={alerts} setDetail={setDetail} />}
+        {tab==="reglages" && <Reglages settings={settings} models={models} accounts={accounts} reload={reload} notify={notify} />}
+      </div>
+
+      {detail && <AccountDetail data={detail} models={models} snaps={snaps} close={()=>setDetail(null)} reload={reload} notify={notify} />}
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+/* ---------- Onglet Dashboard ---------- */
+function Dashboard({ modelRows, noModel, withStats, setDetail, models }) {
+  const totals = useMemo(()=>{
+    const actifs = withStats.filter(x=>x.a.status==="actif");
+    const sum=(f)=>{let t=0,h=false;for(const r of actifs){const v=f(r);if(v!=null){t+=v;h=true;}}return h?t:null;};
+    return { count:actifs.length, followers:sum(r=>r.st.latest?.followers), d7:sum(r=>r.st.d7), views:sum(r=>r.st.latest?.views_30d) };
+  },[withStats]);
+
+  return (
+    <div>
+      <div className="panel">
+        <div className="panel-head"><div className="bar"/><h2>VUE D'ENSEMBLE</h2></div>
+        <table>
+          <tbody>
+            <tr>
+              <td><span className="mut">Comptes actifs</span><div className="num" style={{fontSize:22,fontWeight:700}}>{totals.count}</div></td>
+              <td><span className="mut">Followers cumulés</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.followers)}</div></td>
+              <td><span className="mut">Δ 7 jours</span><div style={{fontSize:22,fontWeight:700}}>{fmtDelta(totals.d7)}</div></td>
+              <td><span className="mut">Vues 30 j</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.views)}</div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="panel">
+        <div className="panel-head"><div className="bar"/><h2>STATS PAR MODÈLE</h2>
+          <span className="hint">clic → ses comptes</span></div>
+        <table>
+          <thead><tr>
+            <th>Modèle</th><th className="r">Comptes</th><th className="r">Followers</th>
+            <th className="r">Δ 7 j</th><th className="r hide-m">Δ 30 j</th>
+            <th className="r">Vues 30 j</th><th className="r hide-m">Reels 30 j</th><th className="r hide-m">Engagement</th>
+          </tr></thead>
+          <tbody>
+            {modelRows.map(r=>
+              <tr key={r.model.id}>
+                <td style={{fontWeight:600}}>{r.model.name}<div className="mut" style={{fontSize:12,fontWeight:400}}>{r.count} compte(s) actif(s)</div></td>
+                <td className="r num">{r.count}</td>
+                <td className="r num" style={{fontWeight:700}}>{fmt(r.followers)}</td>
+                <td className="r">{fmtDelta(r.d7)}</td>
+                <td className="r hide-m">{fmtDelta(r.d30)}</td>
+                <td className="r num" style={{fontWeight:600}}>{fmt(r.views)}</td>
+                <td className="r num hide-m">{r.reels ?? "—"}</td>
+                <td className="r num hide-m">{r.engagement!=null ? r.engagement.toFixed(1).replace(".",",")+" %" : "—"}</td>
+              </tr>
+            )}
+            {noModel > 0 &&
+              <tr><td colSpan="8" className="mut" style={{fontSize:13}}>
+                ⚠ {noModel} compte(s) actif(s) sans modèle assigné — onglet Comptes pour les assigner
+              </td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="panel">
+        <div className="panel-head"><div className="bar"/><h2>TOP COMPTES (VUES 30 J)</h2></div>
+        <table>
+          <thead><tr><th>Compte</th><th className="hide-m">Modèle</th><th className="r">Followers</th><th className="r">Vues 30 j</th><th className="r hide-m">Moy./reel</th></tr></thead>
+          <tbody>
+            {[...withStats].filter(x=>x.a.status==="actif" && x.st.latest?.views_30d!=null)
+              .sort((a,b)=>(b.st.latest.views_30d||0)-(a.st.latest.views_30d||0)).slice(0,10)
+              .map(({a,st})=>
+                <tr key={a.id} className="click" onClick={()=>setDetail({a,st})}>
+                  <td>@{a.username}</td>
+                  <td className="hide-m mut">{models.find(m=>m.id===a.model_id)?.name || "—"}</td>
+                  <td className="r num">{fmt(st.latest?.followers)}</td>
+                  <td className="r num" style={{fontWeight:600}}>{fmt(st.latest?.views_30d)}</td>
+                  <td className="r num hide-m">{fmt(st.avgViews)}</td>
+                </tr>)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Onglet Comptes ---------- */
+function Comptes({ withStats, models, setDetail, reload, notify }) {
+  const [q, setQ] = useState("");
+  const [fModel, setFModel] = useState("");
+  const [fStatus, setFStatus] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+
+  const list = withStats.filter(({a})=>{
+    if (q && !a.username.includes(q.toLowerCase().replace("@",""))) return false;
+    if (fModel==="none" && a.model_id) return false;
+    if (fModel && fModel!=="none" && a.model_id!==fModel) return false;
+    if (fStatus && a.status!==fStatus) return false;
+    return true;
+  });
+
+  async function setRating(a, rating) {
+    await db.from("accounts").update({ rating }).eq("id", a.id);
+    reload();
+  }
+  async function setModel(a, model_id) {
+    await db.from("accounts").update({ model_id: model_id || null }).eq("id", a.id);
+    reload();
+  }
+
+  return (
+    <div>
+      <div className="row" style={{marginBottom:14}}>
+        <input placeholder="Rechercher un compte…" value={q} onChange={e=>setQ(e.target.value)} style={{maxWidth:230}}/>
+        <select value={fModel} onChange={e=>setFModel(e.target.value)} style={{maxWidth:180}}>
+          <option value="">Tous les modèles</option>
+          <option value="none">Sans modèle</option>
+          {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+        <select value={fStatus} onChange={e=>setFStatus(e.target.value)} style={{maxWidth:160}}>
+          <option value="">Tous statuts</option>
+          {Object.entries(STATUS_LABEL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+        </select>
+        <div style={{flex:1}}/>
+        <button className="btn" onClick={()=>setShowAdd(!showAdd)}>{showAdd?"Fermer":"+ Ajouter un compte"}</button>
+      </div>
+
+      {showAdd &&
+        <div className="panel"><div style={{padding:18}}>
+          <AddAccountForm models={models} onDone={()=>{reload();}} notify={notify} />
+        </div></div>}
+
+      <div className="panel">
+        <div className="panel-head"><div className="bar"/><h2>COMPTES</h2><span className="hint">{list.length} affiché(s) — clic sur la ligne → détail</span></div>
+        <table>
+          <thead><tr>
+            <th>Compte</th><th>Modèle</th><th>Statut</th>
+            <th className="r">Followers</th><th className="r hide-m">Δ 7 j</th>
+            <th className="r">Vues 30 j</th><th className="hide-m">Note</th><th className="hide-m">Créé</th>
+          </tr></thead>
+          <tbody>
+            {list.map(({a,st})=>
+              <tr key={a.id} className="click" onClick={()=>setDetail({a,st})}>
+                <td>@{a.username}
+                  {a.device_ref && <div className="mut" style={{fontSize:11.5}}>{a.device_ref}{a.va_name?` · ${a.va_name}`:""}</div>}</td>
+                <td onClick={e=>e.stopPropagation()}>
+                  <select value={a.model_id||""} onChange={e=>setModel(a, e.target.value)} style={{padding:"5px 8px",fontSize:13,width:130}}>
+                    <option value="">— modèle —</option>
+                    {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select></td>
+                <td><StatusBadge account={a}/></td>
+                <td className="r num">{fmt(st.latest?.followers)}</td>
+                <td className="r hide-m">{fmtDelta(st.d7)}</td>
+                <td className="r num">{fmt(st.latest?.views_30d)}</td>
+                <td className="hide-m"><Stars value={a.rating} onChange={r=>setRating(a,r)}/></td>
+                <td className="hide-m mut num">{fmtDate(a.started_on)} · {ageDays(a.started_on)} j</td>
+              </tr>)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Onglet Alertes ---------- */
+function Alertes({ alerts, setDetail }) {
+  const colors = { introuvable:"var(--orange)", banni:"var(--red)", eval:"var(--gold)", inactif:"var(--muted)" };
+  if (!alerts.length) return (
+    <div className="panel"><div style={{padding:26,textAlign:"center"}} className="mut">
+      Rien à signaler — tous les comptes tournent normalement ✓</div></div>
+  );
+  return (
+    <div className="panel">
+      <div className="panel-head"><div className="bar"/><h2>ALERTES</h2><span className="hint">{alerts.length}</span></div>
+      {alerts.map((al,i)=>
+        <div className="alert-line" key={i} style={{cursor:"pointer"}} onClick={()=>setDetail({a:al.a, st:null})}>
+          <div className="dot" style={{background:colors[al.type]}}/>
+          <div style={{fontWeight:600,minWidth:150}}>@{al.a.username}</div>
+          <div className="mut" style={{flex:1}}>{al.txt}</div>
+        </div>)}
+    </div>
+  );
+}
+
+/* ---------- Détail compte (modal) ---------- */
+function AccountDetail({ data, models, snaps, close, reload, notify }) {
+  const a = data.a;
+  const st = data.st || computeAccountStats(a, snaps);
+  const [edit, setEdit] = useState({
+    model_id: a.model_id || "", device_ref: a.device_ref || "", va_name: a.va_name || "",
+    started_on: a.started_on, status: a.status, notes: a.notes || "",
+  });
+
+  async function save() {
+    const patch = { ...edit, model_id: edit.model_id || null };
+    if (patch.status !== a.status) patch.status_changed_on = todayStr();
+    const { error } = await db.from("accounts").update(patch).eq("id", a.id);
+    if (error) notify("Erreur : "+error.message);
+    else { notify("Enregistré ✓"); reload(); close(); }
+  }
+  async function archive() {
+    if (!confirm(`Archiver @${a.username} ? Il disparaît des listes (les données sont conservées).`)) return;
+    await db.from("accounts").update({ active:false, status:"supprime", status_changed_on: todayStr() }).eq("id", a.id);
+    notify("Compte archivé"); reload(); close();
+  }
+
+  return (
+    <div className="overlay" onClick={close}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="row" style={{marginBottom:14}}>
+          <h2 style={{fontSize:18,flex:1}}>@{a.username}</h2>
+          <a className="btn ghost sm" href={"https://instagram.com/"+a.username} target="_blank" rel="noreferrer">Ouvrir Insta</a>
+          <button className="btn ghost sm" onClick={close}>✕</button>
+        </div>
+
+        <div className="row" style={{gap:22,marginBottom:14}} >
+          <div><span className="mut" style={{fontSize:12.5}}>Followers</span><div className="num" style={{fontSize:20,fontWeight:700}}>{fmt(st.latest?.followers)}</div></div>
+          <div><span className="mut" style={{fontSize:12.5}}>Δ 7 j</span><div style={{fontSize:20,fontWeight:700}}>{fmtDelta(st.d7)}</div></div>
+          <div><span className="mut" style={{fontSize:12.5}}>Vues 30 j</span><div className="num" style={{fontSize:20,fontWeight:700}}>{fmt(st.latest?.views_30d)}</div></div>
+          <div><span className="mut" style={{fontSize:12.5}}>Moy./reel</span><div className="num" style={{fontSize:20,fontWeight:700}}>{fmt(st.avgViews)}</div></div>
+          <div><span className="mut" style={{fontSize:12.5}}>Âge</span><div className="num" style={{fontSize:20,fontWeight:700}}>{ageDays(a.started_on)} j</div></div>
+        </div>
+
+        <div className="panel" style={{marginBottom:16}}><div style={{padding:"12px 14px"}}>
+          <Sparkline series={st.series||[]} /></div></div>
+
+        <div className="grid2">
+          <div className="field"><label>Modèle</label>
+            <select value={edit.model_id} onChange={e=>setEdit({...edit,model_id:e.target.value})}>
+              <option value="">— modèle —</option>
+              {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+            </select></div>
+          <div className="field"><label>Statut</label>
+            <select value={edit.status} onChange={e=>setEdit({...edit,status:e.target.value})}>
+              {Object.entries(STATUS_LABEL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+            </select></div>
+          <div className="field"><label>Device</label>
+            <input value={edit.device_ref} onChange={e=>setEdit({...edit,device_ref:e.target.value})}/></div>
+          <div className="field"><label>VA</label>
+            <input value={edit.va_name} onChange={e=>setEdit({...edit,va_name:e.target.value})}/></div>
+          <div className="field"><label>Créé le</label>
+            <input type="date" value={edit.started_on} onChange={e=>setEdit({...edit,started_on:e.target.value})}/></div>
+          <div className="field"><label>Notes</label>
+            <input value={edit.notes} onChange={e=>setEdit({...edit,notes:e.target.value})}/></div>
+        </div>
+
+        <div className="row" style={{marginTop:16}}>
+          <button className="btn" onClick={save}>Enregistrer</button>
+          <div style={{flex:1}}/>
+          <button className="btn danger sm" onClick={archive}>Archiver le compte</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Onglet Réglages ---------- */
+function Reglages({ settings, models, accounts, reload, notify }) {
+  const [adminPin, setAdminPin] = useState(String(settings.admin_pin||""));
+  const [vaPin, setVaPin] = useState(String(settings.va_pin||""));
+  const [seuil, setSeuil] = useState(String(settings.seuil_vues||500));
+  const [newModel, setNewModel] = useState("");
+  const [scanBusy, setScanBusy] = useState(false);
+  const [log, setLog] = useState([]);
+
+  useEffect(()=>{
+    db.from("scan_log").select("*").order("ran_at",{ascending:false}).limit(5)
+      .then(({data})=>setLog(data||[]));
+  },[]);
+
+  async function saveSettings() {
+    const { error } = await db.from("app_settings")
+      .update({ data: { ...settings, admin_pin: adminPin, va_pin: vaPin, seuil_vues: Number(seuil)||500 } })
+      .eq("id",1);
+    if (error) notify("Erreur : "+error.message); else { notify("Réglages enregistrés ✓"); reload(); }
+  }
+
+  async function addModel() {
+    const name = newModel.trim();
+    if (!name) return;
+    const { error } = await db.from("models").insert({ name });
+    if (error) notify("Erreur : "+error.message); else { setNewModel(""); notify("Modèle ajouté ✓"); reload(); }
+  }
+  async function toggleModel(m) {
+    await db.from("models").update({ active: !m.active }).eq("id", m.id);
+    reload();
+  }
+  async function renameModel(m) {
+    const name = prompt("Nouveau nom :", m.name);
+    if (!name || !name.trim()) return;
+    await db.from("models").update({ name: name.trim() }).eq("id", m.id);
+    reload();
+  }
+
+  async function scanNow() {
+    setScanBusy(true);
+    try {
+      const res = await fetch("/.netlify/functions/scrape-now", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ pin: adminPin }),
+      });
+      const j = await res.json();
+      notify(j.ok ? j.message : ("Refusé : " + (j.error||""))); 
+    } catch { notify("Erreur réseau — le site est bien déployé sur Netlify ?"); }
+    setScanBusy(false);
+  }
+
+  return (
+    <div>
+      <div className="panel">
+        <div className="panel-head"><div className="bar"/><h2>SCAN</h2></div>
+        <div style={{padding:18}}>
+          <div className="row">
+            <button className="btn" disabled={scanBusy} onClick={scanNow}>{scanBusy?"…":"Scanner maintenant"}</button>
+            <span className="mut">Le scan automatique tourne chaque nuit à 04:00 (Bangkok). Recharge la page 2-3 min après un scan manuel.</span>
+          </div>
+          {log.length>0 && <div style={{marginTop:14}}>
+            <div className="mut" style={{fontSize:12.5,marginBottom:6}}>Derniers scans</div>
+            {log.map(l=><div key={l.id} className="mut num" style={{fontSize:13}}>
+              {new Date(l.ran_at).toLocaleString("fr-FR",{timeZone:"Asia/Bangkok"})} — {l.accounts_scanned} comptes, {l.errors} erreur(s)</div>)}
+          </div>}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-head"><div className="bar"/><h2>MODÈLES</h2></div>
+        <div style={{padding:18}}>
+          <div className="row" style={{marginBottom:12}}>
+            <input placeholder="Nom de la modèle" value={newModel} onChange={e=>setNewModel(e.target.value)} style={{maxWidth:240}}/>
+            <button className="btn" onClick={addModel}>Ajouter</button>
+          </div>
+          {models.map(m=>
+            <div className="row" key={m.id} style={{padding:"7px 0",borderBottom:"1px solid var(--border)"}}>
+              <div style={{flex:1,opacity:m.active?1:.45}}>{m.name}
+                <span className="mut" style={{fontSize:12,marginLeft:8}}>
+                  {accounts.filter(a=>a.model_id===m.id && a.active).length} compte(s)</span></div>
+              <button className="btn ghost sm" onClick={()=>renameModel(m)}>Renommer</button>
+              <button className="btn ghost sm" onClick={()=>toggleModel(m)}>{m.active?"Désactiver":"Réactiver"}</button>
+            </div>)}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-head"><div className="bar"/><h2>ACCÈS & SEUILS</h2></div>
+        <div style={{padding:18}}>
+          <div className="grid2">
+            <div className="field"><label>PIN admin (toi)</label>
+              <input value={adminPin} onChange={e=>setAdminPin(e.target.value)}/></div>
+            <div className="field"><label>PIN VA</label>
+              <input value={vaPin} onChange={e=>setVaPin(e.target.value)}/></div>
+            <div className="field"><label>Seuil "compte mort" (vues moyennes par reel)</label>
+              <input type="number" value={seuil} onChange={e=>setSeuil(e.target.value)}/></div>
+          </div>
+          <button className="btn" style={{marginTop:14}} onClick={saveSettings}>Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
