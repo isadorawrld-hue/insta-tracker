@@ -96,15 +96,11 @@
 
 <script type="text/babel" data-presets="react">
 /* ============================================================
-   CONFIGURATION — colle ici les 2 valeurs de ton projet Supabase
-   (Supabase > Settings > API)
+   CONFIGURATION — chargée depuis /.netlify/functions/config
+   (les clés vivent uniquement dans les variables Netlify)
    ============================================================ */
-const SUPABASE_URL = "COLLE_ICI_TON_SUPABASE_URL";
-const SUPABASE_ANON_KEY = "COLLE_ICI_TA_CLE_ANON";
-/* ============================================================ */
-
 const { useState, useEffect, useMemo, useRef } = React;
-const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let db = null; // client Supabase, créé après chargement de la config
 
 /* ---------- Helpers ---------- */
 const todayStr = () => new Date().toISOString().slice(0,10);
@@ -203,6 +199,21 @@ function App() {
 
   async function loadAll() {
     setLoading(true);
+    if (!db) {
+      try {
+        const cfg = await (await fetch("/.netlify/functions/config")).json();
+        if (!cfg.url || !cfg.anonKey) {
+          notify("Configuration manquante — ajoute SUPABASE_URL et SUPABASE_ANON_KEY dans les variables Netlify puis redéploie");
+          setLoading(false);
+          return;
+        }
+        db = window.supabase.createClient(cfg.url, cfg.anonKey);
+      } catch (e) {
+        notify("Impossible de charger la configuration — le site est bien déployé sur Netlify ?");
+        setLoading(false);
+        return;
+      }
+    }
     const [se, mo, ac, sn] = await Promise.all([
       db.from("app_settings").select("data").eq("id",1).single(),
       db.from("models").select("*").order("name"),
