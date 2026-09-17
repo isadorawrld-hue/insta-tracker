@@ -1327,7 +1327,8 @@ function Liens({ links, linkStats, countries, vas, reload, say, fixedVa }){
               <tbody>{rows.map(({l,st})=>{
                 const v=st?.[`visits_${suffix}`] ?? null;
                 const c=st?.[`clicks_${suffix}`] ?? null;
-                const ctr=(v>0 && c!=null) ? (c/v)*100 : null;
+                const direct = l.kind==="direct";
+                const ctr=(!direct && v>0 && c!=null) ? (c/v)*100 : null;
                 const isOpen = open===l.link_id;
                 const pays = isOpen ? paysDe(l.link_id) : [];
                 return (
@@ -1336,7 +1337,10 @@ function Liens({ links, linkStats, countries, vas, reload, say, fixedVa }){
                       <td style={{color:"var(--mut-2)",fontSize:12}}>{isOpen?"▾":"▸"}</td>
                       <td>
                         <div className="who">{l.folder_name || "Sans dossier"}</div>
-                        <div className="sub">{l.domain ? `${l.domain}/${l.slug||""}` : (l.slug||l.link_id)}</div>
+                        <div className="sub">
+                          {l.domain ? `${l.domain}/${l.slug||""}` : (l.slug||l.link_id)}
+                          {direct && " · lien direct"}
+                        </div>
                       </td>
                       {!fixedVa &&
                         <td onClick={e=>e.stopPropagation()}>
@@ -1346,7 +1350,9 @@ function Liens({ links, linkStats, countries, vas, reload, say, fixedVa }){
                             {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
                           </select></td>}
                       <td className="r"><Num n={v} style={{fontWeight:700}}/></td>
-                      <td className="r"><Num n={c} style={{color:"var(--violet)",fontWeight:700}}/></td>
+                      <td className="r">{direct
+                        ? <span style={{color:"var(--mut-2)",fontSize:12.5}}>redirection</span>
+                        : <Num n={c} style={{color:"var(--violet)",fontWeight:700}}/>}</td>
                       <td className="r num" style={{fontWeight:600}}>
                         {ctr!=null ? ctr.toFixed(1).replace(".",",")+" %" : "—"}</td>
                     </tr>
@@ -1583,7 +1589,9 @@ function Va({ models, accounts, snaps, refs, vas, links, linkStats, countries, v
                           <div className="sub">{l.domain ? `${l.domain}/${l.slug||""}` : l.slug}</div></td>
                       <td className="r"><Num n={st?.visits_7d} style={{color:"var(--amber)",fontWeight:700}}/></td>
                       <td className="r"><Num n={v} style={{fontWeight:700}}/></td>
-                      <td className="r"><Num n={c} style={{color:"var(--violet)",fontWeight:700}}/></td>
+                      <td className="r">{direct
+                        ? <span style={{color:"var(--mut-2)",fontSize:12.5}}>redirection</span>
+                        : <Num n={c} style={{color:"var(--violet)",fontWeight:700}}/>}</td>
                       <td className="r num" style={{fontWeight:600}}>
                         {ctr!=null ? ctr.toFixed(1).replace(".",",")+" %" : "—"}</td>
                     </tr>);
