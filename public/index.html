@@ -1175,11 +1175,11 @@ function Liens({ links, linkStats, vas, models, reload, say }){
           <span className="hint">synchronisés depuis LinkScale à chaque relevé</span></div>
         {rows.length===0
           ? <div className="empty">
-              Aucun lien pour l'instant. Lance un relevé dans Réglages : les liens de ton projet LinkScale seront importés.
+              Aucun lien suivi. Range tes liens dans des dossiers LinkScale, puis lance un relevé : seuls les liens rangés dans un dossier sont suivis.
             </div>
           : <div className="scroll"><table>
               <thead><tr>
-                <th>Lien</th><th>Dossier</th><th>VA</th>
+                <th>Dossier</th><th>VA</th>
                 <th className="r">Visites</th><th className="r">Visiteurs uniques</th>
                 <th className="r">Humains</th><th className="r">Part humaine</th>
               </tr></thead>
@@ -1191,10 +1191,9 @@ function Liens({ links, linkStats, vas, models, reload, say }){
                 return (
                   <tr key={l.link_id}>
                     <td>
-                      <div className="who">{l.slug || l.link_id}</div>
-                      {l.domain && <div className="sub">{l.domain}</div>}
+                      <div className="who">{l.folder_name || "Sans dossier"}</div>
+                      <div className="sub">{l.domain ? `${l.domain}/${l.slug||""}` : (l.slug||l.link_id)}</div>
                     </td>
-                    <td style={{color:"var(--mut)"}}>{l.folder_name || "—"}</td>
                     <td>
                       <select value={l.va_name||""} onChange={e=>set(l,{va_name:e.target.value||null})}
                         style={{padding:"6px 9px",fontSize:13,width:130}}>
@@ -1211,7 +1210,7 @@ function Liens({ links, linkStats, vas, models, reload, say }){
             </table></div>}
       </div>
       <div style={{color:"var(--mut-2)",fontSize:13,padding:"0 4px"}}>
-        Un lien dont le dossier LinkScale porte le prénom d'une VA lui est attribué automatiquement, sans rien redéployer. Les visiteurs uniques ne sont pas cumulables sur 30 jours : la colonne reste vide sur cette période.
+        Seuls les liens rangés dans un dossier LinkScale sont suivis. Si le dossier porte le prénom d'une VA, le rattachement se fait tout seul — rien à redéployer quand tu ajoutes quelqu'un. Les visiteurs uniques ne s'additionnent pas sur 30 jours, la colonne reste donc vide sur cette période.
       </div>
     </div>
   );
