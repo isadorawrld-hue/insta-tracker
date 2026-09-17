@@ -125,6 +125,32 @@ const fmtDate = (d) => {
 const ageDays = (d) => Math.floor((Date.now() - new Date(d+"T00:00:00").getTime())/86400000);
 const cleanUsername = (u) => u.trim().replace(/^@/,"").replace(/\s+/g,"").toLowerCase();
 
+const PERIODS = [
+  { key:"7d",    label:"7 jours"  },
+  { key:"15d",   label:"15 jours" },
+  { key:"30d",   label:"30 jours" },
+  { key:"total", label:"Total"    },
+];
+// Lit une métrique sur la période choisie, avec repli sur le 30 j (anciens relevés)
+const metric = (snap, name, period) => {
+  if (!snap) return null;
+  const v = snap[`${name}_${period}`];
+  if (v !== null && v !== undefined) return v;
+  if (period === "30d") return null;
+  return null;
+};
+
+function PeriodPicker({ value, onChange }) {
+  return (
+    <div className="row" style={{gap:4}}>
+      {PERIODS.map(p =>
+        <button key={p.key} className={"tab"+(value===p.key?" on":"")}
+          style={{border:"1px solid var(--border)",fontSize:13,padding:"5px 12px"}}
+          onClick={()=>onChange(p.key)}>{p.label}</button>)}
+    </div>
+  );
+}
+
 const STATUS_LABEL = { actif:"Actif", introuvable:"Introuvable", banni:"Banni", supprime:"Supprimé" };
 
 /* ---------- Calculs par compte ---------- */
@@ -143,7 +169,18 @@ function computeAccountStats(account, snaps) {
   const avgViews = (latest && latest.views_30d!=null && latest.reels_30d > 0) ? Math.round(latest.views_30d / latest.reels_30d) : null;
   const engagement = (latest && latest.followers > 0 && (latest.likes_30d || latest.comments_30d))
     ? ((latest.likes_30d + latest.comments_30d) / latest.followers) * 100 : null;
-  return { latest, d7, d30, avgViews, engagement, series: s };
+  // métriques par période, lues depuis le dernier relevé
+  const per = (p) => {
+    if (!latest) return { views:null, reels:null, likes:null, comments:null, avg:null, eng:null };
+    const views = latest[`views_${p}`] ?? null;
+    const reels = latest[`reels_${p}`] ?? null;
+    const likes = latest[`likes_${p}`] ?? null;
+    const comments = latest[`comments_${p}`] ?? null;
+    const avg = (views!=null && reels>0) ? Math.round(views/reels) : null;
+    const eng = (latest.followers>0 && (likes||comments)) ? ((likes+comments)/latest.followers)*100 : null;
+    return { views, reels, likes, comments, avg, eng };
+  };
+  return { latest, d7, d30, avgViews, engagement, per, series: s };
 }
 
 /* ---------- Sparkline SVG ---------- */
@@ -221,7 +258,7 @@ function App() {
       db.from("app_settings").select("data").eq("id",1).single(),
       db.from("models").select("*").order("name"),
       db.from("accounts").select("*").order("username"),
-      db.from("snapshots").select("account_id,taken_on,followers,following,posts_count,views_30d,reels_30d,likes_30d,comments_30d").gte("taken_on", daysAgoStr(45)).order("taken_on"),
+      db.from("snapshots").select("account_id,taken_on,followers,following,posts_count,views_7d,reels_7d,likes_7d,comments_7d,views_15d,reels_15d,likes_15d,comments_15d,views_30d,reels_30d,likes_30d,comments_30d,views_total,reels_total,likes_total,comments_total").gte("taken_on", daysAgoStr(45)).order("taken_on"),
       db.from("vas").select("*").order("name"),
       db.from("ref_accounts").select("*").order("username"),
     ]);
@@ -536,6 +573,7 @@ function VaApp({ models, accounts, snaps, refs, vaName, reload, notify, logout, 
    ============================================================ */
 function AdminApp({ settings, models, accounts, snaps, vas, refs, reload, notify, logout, toast }) {
   const [tab, setTab] = useState("dash");
+  const [period, setPeriod] = useState("30d");
   const [detail, setDetail] = useState(null);
 
   const seuil = Number(settings.seuil_vues || 500);
@@ -548,18 +586,19 @@ function AdminApp({ settings, models, accounts, snaps, vas, refs, reload, notify
       const rows = withStats.filter(x=>x.a.model_id===m.id && x.a.status==="actif");
       const sum = (f)=>{ let t=0,has=false; for(const r of rows){ const v=f(r); if(v!=null){t+=v;has=true;} } return has?t:null; };
       const followers = sum(r=>r.st.latest?.followers);
-      const likes = sum(r=>r.st.latest?.likes_30d) || 0;
-      const comments = sum(r=>r.st.latest?.comments_30d) || 0;
+      const likes = sum(r=>r.st.per(period).likes) || 0;
+      const comments = sum(r=>r.st.per(period).comments) || 0;
       return {
         model: m, count: rows.length,
         followers,
         d7: sum(r=>r.st.d7), d30: sum(r=>r.st.d30),
-        views: sum(r=>r.st.latest?.views_30d),
-        reels: sum(r=>r.st.latest?.reels_30d),
-        engagement: followers > 0 ? ((likes+comments)/followers)*100 : null,
+        views: sum(r=>r.st.per(period).views),
+        reels: sum(r=>r.st.per(period).reels),
+        likes, comments,
+        engagement: followers > 0 && (likes||comments) ? ((likes+comments)/followers)*100 : null,
       };
     }).sort((x,y)=>(y.followers||0)-(x.followers||0));
-  },[models, withStats]);
+  },[models, withStats, period]);
 
   /* --- agrégats par VA --- */
   const vaRows = useMemo(()=>{
@@ -572,14 +611,16 @@ function AdminApp({ settings, models, accounts, snaps, vas, refs, reload, notify
         name, count: list.length,
         followers: sum(r=>r.st.latest?.followers),
         d7: sum(r=>r.st.d7),
-        views: sum(r=>r.st.latest?.views_30d),
-        reels: sum(r=>r.st.latest?.reels_30d),
+        views: sum(r=>r.st.per(period).views),
+        reels: sum(r=>r.st.per(period).reels),
+        likes: sum(r=>r.st.per(period).likes),
+        comments: sum(r=>r.st.per(period).comments),
         bannis: withStats.filter(x=>x.a.va_name===name && (x.a.status==="banni"||x.a.status==="introuvable")).length,
       };
     }).sort((a,b)=>(b.views||0)-(a.views||0));
     const orphan = withStats.filter(x=>!x.a.va_name && x.a.status==="actif").length;
     return { rows, orphan };
-  },[withStats, vas]);
+  },[withStats, vas, period]);
 
   const noModel = withStats.filter(x=>!x.a.model_id && x.a.status==="actif").length;
 
@@ -613,7 +654,7 @@ function AdminApp({ settings, models, accounts, snaps, vas, refs, reload, notify
       </div>
 
       <div className="wrap">
-        {tab==="dash" && <Dashboard modelRows={modelRows} vaRows={vaRows} noModel={noModel} withStats={withStats} setDetail={setDetail} models={models} />}
+        {tab==="dash" && <Dashboard modelRows={modelRows} vaRows={vaRows} noModel={noModel} withStats={withStats} setDetail={setDetail} models={models} period={period} setPeriod={setPeriod} />}
         {tab==="comptes" && <Comptes withStats={withStats} models={models} vas={vas} setDetail={setDetail} reload={reload} notify={notify} />}
         {tab==="refs" && <RefAccounts refs={refs} admin={true} reload={reload} notify={notify} />}
         {tab==="alertes" && <Alertes alerts={alerts} setDetail={setDetail} />}
@@ -627,24 +668,28 @@ function AdminApp({ settings, models, accounts, snaps, vas, refs, reload, notify
 }
 
 /* ---------- Onglet Dashboard ---------- */
-function Dashboard({ modelRows, vaRows, noModel, withStats, setDetail, models }) {
+function Dashboard({ modelRows, vaRows, noModel, withStats, setDetail, models, period, setPeriod }) {
+  const plabel = (PERIODS.find(p=>p.key===period)||{}).label;
   const totals = useMemo(()=>{
     const actifs = withStats.filter(x=>x.a.status==="actif");
     const sum=(f)=>{let t=0,h=false;for(const r of actifs){const v=f(r);if(v!=null){t+=v;h=true;}}return h?t:null;};
-    return { count:actifs.length, followers:sum(r=>r.st.latest?.followers), d7:sum(r=>r.st.d7), views:sum(r=>r.st.latest?.views_30d) };
-  },[withStats]);
+    return { count:actifs.length, followers:sum(r=>r.st.latest?.followers), d7:sum(r=>r.st.d7),
+      views:sum(r=>r.st.per(period).views), comments:sum(r=>r.st.per(period).comments), likes:sum(r=>r.st.per(period).likes) };
+  },[withStats, period]);
 
   return (
     <div>
       <div className="panel">
-        <div className="panel-head"><div className="bar"/><h2>VUE D'ENSEMBLE</h2></div>
+        <div className="panel-head"><div className="bar"/><h2>VUE D'ENSEMBLE</h2>
+          <PeriodPicker value={period} onChange={setPeriod} /></div>
         <table>
           <tbody>
             <tr>
               <td><span className="mut">Comptes actifs</span><div className="num" style={{fontSize:22,fontWeight:700}}>{totals.count}</div></td>
               <td><span className="mut">Followers cumulés</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.followers)}</div></td>
               <td><span className="mut">Δ 7 jours</span><div style={{fontSize:22,fontWeight:700}}>{fmtDelta(totals.d7)}</div></td>
-              <td><span className="mut">Vues 30 j</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.views)}</div></td>
+              <td><span className="mut">Vues · {plabel}</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.views)}</div></td>
+              <td><span className="mut">Commentaires · {plabel}</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.comments)}</div></td>
             </tr>
           </tbody>
         </table>
@@ -652,12 +697,13 @@ function Dashboard({ modelRows, vaRows, noModel, withStats, setDetail, models })
 
       <div className="panel">
         <div className="panel-head"><div className="bar"/><h2>STATS PAR MODÈLE</h2>
-          <span className="hint">clic → ses comptes</span></div>
+          <span className="hint">période : {plabel}</span></div>
         <table>
           <thead><tr>
             <th>Modèle</th><th className="r">Comptes</th><th className="r">Followers</th>
             <th className="r">Δ 7 j</th><th className="r hide-m">Δ 30 j</th>
-            <th className="r">Vues 30 j</th><th className="r hide-m">Reels 30 j</th><th className="r hide-m">Engagement</th>
+            <th className="r">Vues</th><th className="r hide-m">Reels</th>
+            <th className="r hide-m">Likes</th><th className="r">Comm.</th><th className="r hide-m">Engagement</th>
           </tr></thead>
           <tbody>
             {modelRows.map(r=>
@@ -669,11 +715,13 @@ function Dashboard({ modelRows, vaRows, noModel, withStats, setDetail, models })
                 <td className="r hide-m">{fmtDelta(r.d30)}</td>
                 <td className="r num" style={{fontWeight:600}}>{fmt(r.views)}</td>
                 <td className="r num hide-m">{r.reels ?? "—"}</td>
+                <td className="r num hide-m">{fmt(r.likes)}</td>
+                <td className="r num" style={{fontWeight:600}}>{fmt(r.comments)}</td>
                 <td className="r num hide-m">{r.engagement!=null ? r.engagement.toFixed(1).replace(".",",")+" %" : "—"}</td>
               </tr>
             )}
             {noModel > 0 &&
-              <tr><td colSpan="8" className="mut" style={{fontSize:13}}>
+              <tr><td colSpan="10" className="mut" style={{fontSize:13}}>
                 ⚠ {noModel} compte(s) actif(s) sans modèle assigné — onglet Comptes pour les assigner
               </td></tr>}
           </tbody>
@@ -682,16 +730,17 @@ function Dashboard({ modelRows, vaRows, noModel, withStats, setDetail, models })
 
       <div className="panel">
         <div className="panel-head"><div className="bar"/><h2>STATS PAR VA</h2>
-          <span className="hint">performance de chaque VA</span></div>
+          <span className="hint">période : {plabel}</span></div>
         <table>
           <thead><tr>
             <th>VA</th><th className="r">Comptes actifs</th><th className="r">Followers</th>
-            <th className="r">Δ 7 j</th><th className="r">Vues 30 j</th>
-            <th className="r hide-m">Reels 30 j</th><th className="r hide-m">Bannis / introuvables</th>
+            <th className="r">Δ 7 j</th><th className="r">Vues</th>
+            <th className="r hide-m">Reels</th><th className="r">Comm.</th>
+            <th className="r hide-m">Bannis / introuvables</th>
           </tr></thead>
           <tbody>
             {vaRows.rows.length === 0 &&
-              <tr><td colSpan="7" className="mut" style={{fontSize:13}}>
+              <tr><td colSpan="8" className="mut" style={{fontSize:13}}>
                 Aucune VA enregistrée — ajoute-les dans Réglages.
               </td></tr>}
             {vaRows.rows.map(r=>
@@ -702,10 +751,11 @@ function Dashboard({ modelRows, vaRows, noModel, withStats, setDetail, models })
                 <td className="r">{fmtDelta(r.d7)}</td>
                 <td className="r num" style={{fontWeight:600}}>{fmt(r.views)}</td>
                 <td className="r num hide-m">{r.reels ?? "—"}</td>
+                <td className="r num" style={{fontWeight:600}}>{fmt(r.comments)}</td>
                 <td className="r num hide-m">{r.bannis || "—"}</td>
               </tr>)}
             {vaRows.orphan > 0 &&
-              <tr><td colSpan="7" className="mut" style={{fontSize:13}}>
+              <tr><td colSpan="8" className="mut" style={{fontSize:13}}>
                 ⚠ {vaRows.orphan} compte(s) actif(s) sans VA assignée — onglet Comptes pour les assigner
               </td></tr>}
           </tbody>
@@ -886,6 +936,33 @@ function AccountDetail({ data, models, vas, snaps, close, reload, notify }) {
           <div><span className="mut" style={{fontSize:12.5}}>Vues 30 j</span><div className="num" style={{fontSize:20,fontWeight:700}}>{fmt(st.latest?.views_30d)}</div></div>
           <div><span className="mut" style={{fontSize:12.5}}>Moy./reel</span><div className="num" style={{fontSize:20,fontWeight:700}}>{fmt(st.avgViews)}</div></div>
           <div><span className="mut" style={{fontSize:12.5}}>Âge</span><div className="num" style={{fontSize:20,fontWeight:700}}>{ageDays(a.started_on)} j</div></div>
+        </div>
+
+        <div className="panel" style={{marginBottom:16}}>
+          <div className="panel-head"><div className="bar"/><h2>PAR PÉRIODE</h2></div>
+          <table>
+            <thead><tr>
+              <th>Période</th><th className="r">Reels</th><th className="r">Vues</th>
+              <th className="r">Moy./reel</th><th className="r">Likes</th>
+              <th className="r">Commentaires</th><th className="r hide-m">Engagement</th>
+            </tr></thead>
+            <tbody>
+              {PERIODS.map(pd=>{
+                const m = st.per ? st.per(pd.key) : null;
+                return (
+                  <tr key={pd.key}>
+                    <td style={{fontWeight:600}}>{pd.label}</td>
+                    <td className="r num">{m?.reels ?? "—"}</td>
+                    <td className="r num" style={{fontWeight:600}}>{fmt(m?.views)}</td>
+                    <td className="r num">{fmt(m?.avg)}</td>
+                    <td className="r num">{fmt(m?.likes)}</td>
+                    <td className="r num" style={{fontWeight:600}}>{fmt(m?.comments)}</td>
+                    <td className="r num hide-m">{m?.eng!=null ? m.eng.toFixed(1).replace(".",",")+" %" : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
 
         <div className="panel" style={{marginBottom:16}}><div style={{padding:"12px 14px"}}>
