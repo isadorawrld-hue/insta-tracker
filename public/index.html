@@ -139,6 +139,7 @@
   .c-actif{background:rgba(61,220,151,.13);color:var(--mint)}
   .c-banni{background:rgba(255,107,107,.14);color:var(--coral)}
   .c-introuvable{background:rgba(249,160,63,.15);color:var(--amber)}
+  .c-restreint{background:rgba(249,160,63,.16);color:var(--amber)}
   .c-supprime{background:var(--n3);color:var(--mut-2)}
 
   .btn{
@@ -253,7 +254,7 @@ const PERIODS = [
   { key:"30d", label:"30 jours", days:30 },
   { key:"total", label:"Total", days:null },
 ];
-const STATUS = { actif:"Actif", introuvable:"Introuvable", banni:"Banni", supprime:"Supprimé" };
+const STATUS = { actif:"Actif", restreint:"Restreint", introuvable:"Introuvable", banni:"Banni", supprime:"Supprimé" };
 
 /* ---------- paliers de vues (30 jours) ---------- */
 const TIERS = [
@@ -315,6 +316,15 @@ function stats(account, snaps){
   };
   return { latest, tracked, d7:dFol(7), d30:dFol(30), per, dViews, series:s };
 }
+// Codes pays les plus courants, en clair
+const PAYS = { FR:"France", US:"États-Unis", BE:"Belgique", CH:"Suisse", CA:"Canada",
+  MA:"Maroc", DZ:"Algérie", TN:"Tunisie", GB:"Royaume-Uni", DE:"Allemagne", ES:"Espagne",
+  IT:"Italie", PT:"Portugal", NL:"Pays-Bas", SN:"Sénégal", CI:"Côte d'Ivoire", CM:"Cameroun",
+  MG:"Madagascar", TH:"Thaïlande", BR:"Brésil", MX:"Mexique", IN:"Inde", PH:"Philippines",
+  ID:"Indonésie", TR:"Turquie", RU:"Russie", PL:"Pologne", RO:"Roumanie", AU:"Australie",
+  JP:"Japon", KR:"Corée du Sud", SA:"Arabie saoudite", AE:"Émirats arabes unis", EG:"Égypte" };
+const paysNom = (c) => PAYS[c] || c;
+
 // Dernier relevé connu d'un lien
 function lastLinkStat(linkId, linkStats){
   const s = linkStats.filter(x=>x.link_id===linkId).sort((a,b)=>a.taken_on<b.taken_on?-1:1);
@@ -396,6 +406,7 @@ function App(){
   const [refs,setRefs] = useState([]);
   const [links,setLinks] = useState([]);
   const [linkStats,setLinkStats] = useState([]);
+  const [countries,setCountries] = useState([]);
   const [loading,setLoading] = useState(true);
   const [toast,setToast] = useState(null);
   const say = (m)=>{ setToast(m); setTimeout(()=>setToast(null),3400); };
@@ -412,7 +423,7 @@ function App(){
     const cols = "account_id,taken_on,followers,following,posts_count,"
       + "views_7d,reels_7d,likes_7d,comments_7d,views_15d,reels_15d,likes_15d,comments_15d,"
       + "views_30d,reels_30d,likes_30d,comments_30d,views_total,reels_total,likes_total,comments_total";
-    const [se,mo,ac,sn,va,rf,lk,ls] = await Promise.all([
+    const [se,mo,ac,sn,va,rf,lk,ls,lc] = await Promise.all([
       db.from("app_settings").select("data").eq("id",1).single(),
       db.from("models").select("*").order("name"),
       db.from("accounts").select("*").order("username"),
@@ -421,12 +432,13 @@ function App(){
       db.from("ref_accounts").select("*").order("username"),
       db.from("links").select("*").eq("active",true).order("slug"),
       db.from("link_stats").select("link_id,taken_on,visits_7d,visits_30d,uniques_7d,uniques_30d,clicks_7d,clicks_30d").gte("taken_on",daysAgoStr(60)).order("taken_on"),
+      db.from("link_countries").select("link_id,taken_on,country,visits").gte("taken_on",daysAgoStr(10)).order("visits",{ascending:false}),
     ]);
     if (se.error||mo.error||ac.error||sn.error) say("Erreur de chargement des données");
     if (va.error||rf.error) say("Tables VA / références absentes — lance supabase-v2.sql");
     setSettings(se.data?.data||{}); setModels(mo.data||[]); setAccounts(ac.data||[]);
     setSnaps(sn.data||[]); setVas(va.data||[]); setRefs(rf.data||[]);
-    setLinks(lk.data||[]); setLinkStats(ls.data||[]);
+    setLinks(lk.data||[]); setLinkStats(ls.data||[]); setCountries(lc.data||[]);
     setLoading(false);
   }
   useEffect(()=>{ load(); },[]);
@@ -443,7 +455,7 @@ function App(){
   if (loading) return <div className="gate"><div style={{color:"var(--mut)"}}>Chargement…</div></div>;
   if (!role) return <Gate onEnter={enter}/>;
   if (role==="va" && !vaName) return <PickVa vas={vas.filter(v=>v.active)} onPick={pick} back={out}/>;
-  const shared = { models, accounts, snaps, vas, refs, links, linkStats, reload:load, say, out, toast };
+  const shared = { models, accounts, snaps, vas, refs, links, linkStats, countries, reload:load, say, out, toast };
   return role==="admin"
     ? <Admin settings={settings} {...shared}/>
     : <Va vaName={vaName} {...shared}/>;
@@ -528,7 +540,7 @@ function Hero({ views30, views7, views15, dv7, dv30, accounts, tracked }){
 /* ============================================================
    VUE ADMIN
    ============================================================ */
-function Admin({ settings, models, accounts, snaps, vas, refs, links, linkStats, reload, say, out, toast }){
+function Admin({ settings, models, accounts, snaps, vas, refs, links, linkStats, countries, reload, say, out, toast }){
   const [tab,setTab] = useState("dash");
   const [period,setPeriod] = useState("30d");
   const [detail,setDetail] = useState(null);
@@ -581,6 +593,7 @@ function Admin({ settings, models, accounts, snaps, vas, refs, links, linkStats,
   const alerts = useMemo(()=>{
     const out=[];
     for(const {a,st} of rows){
+      if(a.status==="restreint") out.push({t:"restreint",a,txt:`Profil restreint par Instagram depuis le ${fmtDate(a.status_changed_on)} : invisible pour les visiteurs non connectés. Aucune statistique lisible de l'extérieur, et une partie du trafic ne peut pas ouvrir le compte.`});
       if(a.status==="introuvable") out.push({t:"introuvable",a,txt:`Introuvable depuis le ${fmtDate(a.status_changed_on)}. Banni probable — à vérifier sur le téléphone.`});
       if(a.status==="banni") out.push({t:"banni",a,txt:"Banni. Supprime le container, recrée-en un, puis archive ce compte ici."});
       if(a.status==="actif" && ageDays(a.started_on)>=14){
@@ -705,7 +718,7 @@ function Admin({ settings, models, accounts, snaps, vas, refs, links, linkStats,
 
         {tab==="classement" && <Classement accounts={accounts} snaps={snaps} vas={vas} links={links} linkStats={linkStats} me={null}/>}
         {tab==="comptes" && <Comptes rows={rows} models={models} vas={vas} open={setDetail} reload={reload} say={say}/>}
-        {tab==="liens" && <Liens links={links} linkStats={linkStats} vas={vas} models={models} reload={reload} say={say}/>}
+        {tab==="liens" && <Liens links={links} linkStats={linkStats} countries={countries} vas={vas} reload={reload} say={say}/>}
         {tab==="refs" && <Refs refs={refs} admin reload={reload} say={say}/>}
         {tab==="alertes" && <Alertes alerts={alerts} open={a=>setDetail({a,st:stats(a,snaps)})}/>}
         {tab==="reglages" && <Reglages settings={settings} models={models} vas={vas} accounts={accounts} reload={reload} say={say}/>}
@@ -902,7 +915,7 @@ function Refs({ refs, admin, reload, say }){
    ALERTES
    ============================================================ */
 function Alertes({ alerts, open }){
-  const col={introuvable:"var(--amber)",banni:"var(--coral)",eval:"var(--magenta)",muet:"var(--mut)"};
+  const col={restreint:"var(--amber)",introuvable:"var(--amber)",banni:"var(--coral)",eval:"var(--magenta)",muet:"var(--mut)"};
   if(!alerts.length) return <div className="panel"><div className="empty">
     Rien à traiter. Tous les comptes tournent normalement.</div></div>;
   return (
@@ -967,6 +980,19 @@ function Detail({ data, models, vas, snaps, close, reload, say }){
             </div>
           </div>
         </div>
+
+        {a.status==="restreint" &&
+          <div className="panel" style={{borderColor:"var(--amber)"}}>
+            <div style={{padding:"15px 18px",fontSize:14}}>
+              <strong style={{color:"var(--amber)"}}>Profil restreint par Instagram.</strong>
+              <div style={{color:"var(--mut)",marginTop:5}}>
+                Le compte est invisible pour les visiteurs non connectés, donc aucune statistique
+                ne peut être relevée de l'extérieur. Tu vois les chiffres dans l'app parce que tu es
+                connecté. Le tracker retente chaque nuit : dès que le compte redevient public,
+                les chiffres reviennent tout seuls.
+              </div>
+            </div>
+          </div>}
 
         <div className="panel">
           <div className="ph"><h2>Chiffres par période</h2></div>
@@ -1146,15 +1172,29 @@ function Reglages({ settings, models, vas, accounts, reload, say }){
 /* ============================================================
    LIENS LINKSCALE
    ============================================================ */
-function Liens({ links, linkStats, vas, models, reload, say }){
+function Liens({ links, linkStats, countries, vas, reload, say }){
   const [period,setPeriod]=useState("30d");
   const [fv,setFv]=useState("");
+  const [open,setOpen]=useState(null);
   const suffix = period==="7d" ? "7d" : "30d";
+
   const rows = (links||[]).filter(l=>!fv || (fv==="none" ? !l.va_name : l.va_name===fv))
     .map(l=>({ l, st:lastLinkStat(l.link_id, linkStats||[]) }))
     .sort((a,b)=>((b.st?.[`visits_${suffix}`]||0)-(a.st?.[`visits_${suffix}`]||0)));
   const set = async (l,patch)=>{ await db.from("links").update(patch).eq("link_id",l.link_id); reload(); };
-  const tot = clicksOf(rows.map(r=>r.l), linkStats||[], suffix);
+
+  const totV = rows.reduce((t,r)=>t+(r.st?.[`visits_${suffix}`]||0),0);
+  const totC = rows.reduce((t,r)=>t+(r.st?.[`clicks_${suffix}`]||0),0);
+
+  // pays du dernier relevé, pour un lien
+  const paysDe = (linkId) => {
+    const all = (countries||[]).filter(c=>c.link_id===linkId);
+    if (all.length===0) return [];
+    const last = all.reduce((m,c)=>c.taken_on>m?c.taken_on:m, all[0].taken_on);
+    const day = all.filter(c=>c.taken_on===last);
+    const tot = day.reduce((t,c)=>t+c.visits,0) || 1;
+    return day.sort((a,b)=>b.visits-a.visits).map(c=>({...c, pct:(c.visits/tot)*100}));
+  };
 
   return (
     <div>
@@ -1166,51 +1206,79 @@ function Liens({ links, linkStats, vas, models, reload, say }){
         </select>
         <div style={{flex:1}}/>
         <span style={{color:"var(--mut)",fontSize:13.5}}>
-          {rows.length} lien{rows.length>1?"s":""} · {fmtTxt(tot.visits)} visites · {fmtTxt(tot.clicks)} humains
+          {rows.length} lien{rows.length>1?"s":""} · {fmtTxt(totV)} vues · {fmtTxt(totC)} clics
         </span>
       </div>
 
       <div className="panel">
         <div className="ph"><h2>Liens suivis</h2>
-          <span className="hint">synchronisés depuis LinkScale à chaque relevé</span></div>
+          <span className="hint">clique une ligne pour voir les pays</span></div>
         {rows.length===0
           ? <div className="empty">
-              Aucun lien suivi. Range tes liens dans des dossiers LinkScale, puis lance un relevé : seuls les liens rangés dans un dossier sont suivis.
+              Aucun lien suivi. Range tes liens dans des dossiers LinkScale, puis lance un relevé.
             </div>
           : <div className="scroll"><table>
               <thead><tr>
-                <th>Dossier</th><th>VA</th>
-                <th className="r">Visites</th><th className="r">Visiteurs uniques</th>
-                <th className="r">Humains</th><th className="r">Part humaine</th>
+                <th style={{width:30}}></th><th>Dossier</th><th>VA</th>
+                <th className="r">Vues du lien</th><th className="r">Clics</th><th className="r">Taux de clic</th>
               </tr></thead>
               <tbody>{rows.map(({l,st})=>{
                 const v=st?.[`visits_${suffix}`] ?? null;
-                const u=st?.[`uniques_${suffix}`] ?? null;
                 const c=st?.[`clicks_${suffix}`] ?? null;
                 const ctr=(v>0 && c!=null) ? (c/v)*100 : null;
+                const isOpen = open===l.link_id;
+                const pays = isOpen ? paysDe(l.link_id) : [];
                 return (
-                  <tr key={l.link_id}>
-                    <td>
-                      <div className="who">{l.folder_name || "Sans dossier"}</div>
-                      <div className="sub">{l.domain ? `${l.domain}/${l.slug||""}` : (l.slug||l.link_id)}</div>
-                    </td>
-                    <td>
-                      <select value={l.va_name||""} onChange={e=>set(l,{va_name:e.target.value||null})}
-                        style={{padding:"6px 9px",fontSize:13,width:130}}>
-                        <option value="">—</option>
-                        {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
-                      </select></td>
-                    <td className="r"><Num n={v} style={{fontWeight:700}}/></td>
-                    <td className="r"><Num n={u}/></td>
-                    <td className="r"><Num n={c} style={{color:"var(--violet)",fontWeight:700}}/></td>
-                    <td className="r num">{ctr!=null ? ctr.toFixed(1).replace(".",",")+" %" : "—"}</td>
-                  </tr>
+                  <React.Fragment key={l.link_id}>
+                    <tr className="tap" onClick={()=>setOpen(isOpen?null:l.link_id)}>
+                      <td style={{color:"var(--mut-2)",fontSize:12}}>{isOpen?"▾":"▸"}</td>
+                      <td>
+                        <div className="who">{l.folder_name || "Sans dossier"}</div>
+                        <div className="sub">{l.domain ? `${l.domain}/${l.slug||""}` : (l.slug||l.link_id)}</div>
+                      </td>
+                      <td onClick={e=>e.stopPropagation()}>
+                        <select value={l.va_name||""} onChange={e=>set(l,{va_name:e.target.value||null})}
+                          style={{padding:"6px 9px",fontSize:13,width:130}}>
+                          <option value="">—</option>
+                          {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+                        </select></td>
+                      <td className="r"><Num n={v} style={{fontWeight:700}}/></td>
+                      <td className="r"><Num n={c} style={{color:"var(--violet)",fontWeight:700}}/></td>
+                      <td className="r num" style={{fontWeight:600}}>
+                        {ctr!=null ? ctr.toFixed(1).replace(".",",")+" %" : "—"}</td>
+                    </tr>
+                    {isOpen &&
+                      <tr><td colSpan="6" style={{background:"var(--n0)",padding:"16px 20px"}}>
+                        {pays.length===0
+                          ? <div style={{color:"var(--mut-2)",fontSize:13.5}}>
+                              Pas encore de données de pays pour ce lien. Elles arrivent au prochain relevé.
+                            </div>
+                          : <div>
+                              <div style={{color:"var(--mut)",fontSize:12.5,marginBottom:10}}>
+                                D'où viennent les visiteurs, sur 30 jours
+                              </div>
+                              {pays.map(c=>
+                                <div key={c.country} style={{display:"flex",alignItems:"center",gap:12,marginBottom:7}}>
+                                  <div style={{width:130,fontSize:13.5,fontWeight:600}}>{paysNom(c.country)}</div>
+                                  <div style={{flex:1,height:7,borderRadius:99,background:"var(--n3)",overflow:"hidden",maxWidth:340}}>
+                                    <div style={{width:c.pct+"%",height:"100%",borderRadius:99,
+                                      background:c.country==="FR"||c.country==="US" ? "var(--grad)" : "var(--violet)"}}/>
+                                  </div>
+                                  <div className="num" style={{width:56,textAlign:"right",fontWeight:700}}>
+                                    {c.pct.toFixed(1).replace(".",",")} %</div>
+                                  <div className="num" style={{width:52,textAlign:"right",color:"var(--mut-2)",fontSize:13}}>
+                                    {c.visits}</div>
+                                </div>)}
+                            </div>}
+                      </td></tr>}
+                  </React.Fragment>
                 );
               })}</tbody>
             </table></div>}
       </div>
       <div style={{color:"var(--mut-2)",fontSize:13,padding:"0 4px"}}>
-        Seuls les liens rangés dans un dossier LinkScale sont suivis. Si le dossier porte le prénom d'une VA, le rattachement se fait tout seul — rien à redéployer quand tu ajoutes quelqu'un. Les visiteurs uniques ne s'additionnent pas sur 30 jours, la colonne reste donc vide sur cette période.
+        Seuls les liens rangés dans un dossier LinkScale sont suivis. Si le dossier porte le prénom d'une VA,
+        le rattachement se fait tout seul — rien à redéployer quand tu ajoutes quelqu'un.
       </div>
     </div>
   );
@@ -1296,7 +1364,7 @@ function Classement({ accounts, snaps, vas, links, linkStats, me }){
             <th style={{width:44}}></th><th>VA</th><th className="r">Comptes</th>
             <th className="r">Vues 7 j</th><th className="r">Vues 15 j</th><th className="r">Vues 30 j</th>
             <th className="r">Reels</th><th className="r">Commentaires</th>
-            <th className="r">Engagement</th><th className="r">Visites liens</th>
+            <th className="r">Engagement</th><th className="r">Vues liens</th>
             <th className="r">Abonnés</th><th className="r">Δ abonnés 7 j</th>
           </tr></thead>
           <tbody>
