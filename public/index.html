@@ -157,11 +157,18 @@ const STATUS_LABEL = { actif:"Actif", introuvable:"Introuvable", banni:"Banni", 
 function computeAccountStats(account, snaps) {
   const s = snaps.filter(x => x.account_id === account.id).sort((a,b)=>a.taken_on<b.taken_on?-1:1);
   const latest = s[s.length-1] || null;
+  // Combien de jours d'historique a-t-on réellement pour ce compte ?
+  const daysTracked = (s.length > 1)
+    ? Math.round((new Date(s[s.length-1].taken_on) - new Date(s[0].taken_on)) / 86400000)
+    : 0;
+  // Référence à J-n : uniquement si on a vraiment un relevé assez ancien.
+  // Sinon null — pas de repli sur le plus ancien, ça donnerait un Δ mensonger.
   const at = (nDays) => {
+    if (daysTracked < nDays) return null;
     const target = daysAgoStr(nDays);
     let best = null;
     for (const x of s) { if (x.taken_on <= target) best = x; }
-    return best || (s.length > 1 ? s[0] : null);
+    return best;
   };
   const s7 = at(7), s30 = at(30);
   const d7  = (latest && s7 && s7 !== latest && latest.followers!=null && s7.followers!=null) ? latest.followers - s7.followers : null;
@@ -177,10 +184,23 @@ function computeAccountStats(account, snaps) {
     const likes = latest[`likes_${p}`] ?? null;
     const comments = latest[`comments_${p}`] ?? null;
     const avg = (views!=null && reels>0) ? Math.round(views/reels) : null;
-    const eng = (latest.followers>0 && (likes||comments)) ? ((likes+comments)/latest.followers)*100 : null;
+    // Taux d'engagement standard : interactions MOYENNES par reel / followers
+    const eng = (latest.followers>0 && reels>0 && (likes||comments))
+      ? (((likes+comments)/reels)/latest.followers)*100 : null;
     return { views, reels, likes, comments, avg, eng };
   };
-  return { latest, d7, d30, avgViews, engagement, per, series: s };
+  // Δ VUES : compare la fenêtre actuelle à la même fenêtre décalée dans le passé.
+  // Ex. période 7 j → vues des 7 derniers jours vs vues des 7 jours d'avant.
+  const deltaViews = (p) => {
+    const nDays = p === "7d" ? 7 : p === "15d" ? 15 : p === "30d" ? 30 : null;
+    if (nDays === null || !latest || daysTracked < nDays) return null;
+    const ref = at(nDays);
+    if (!ref || ref === latest) return null;
+    const a = latest[`views_${p}`], b = ref[`views_${p}`];
+    if (a == null || b == null) return null;
+    return a - b;
+  };
+  return { latest, d7, d30, daysTracked, avgViews, engagement, per, deltaViews, series: s };
 }
 
 /* ---------- Sparkline SVG ---------- */
@@ -517,7 +537,7 @@ function VaApp({ models, accounts, snaps, refs, vaName, reload, notify, logout, 
             <table><tbody><tr>
               <td><span className="mut">Mes comptes actifs</span><div className="num" style={{fontSize:22,fontWeight:700}}>{totals.count}</div></td>
               <td><span className="mut">Followers cumulés</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.followers)}</div></td>
-              <td><span className="mut">Δ 7 jours</span><div style={{fontSize:22,fontWeight:700}}>{fmtDelta(totals.d7)}</div></td>
+              <td><span className="mut">Followers · Δ 7 jours</span><div style={{fontSize:22,fontWeight:700}}>{fmtDelta(totals.d7)}</div></td>
               <td><span className="mut">Vues 30 j</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.views)}</div></td>
             </tr></tbody></table>
           </div>
@@ -540,7 +560,7 @@ function VaApp({ models, accounts, snaps, refs, vaName, reload, notify, logout, 
               <div className="panel-head"><div className="bar"/><h2>{modelName.toUpperCase()}</h2>
                 <span className="hint">{list.length} compte(s)</span></div>
               <table>
-                <thead><tr><th>Compte</th><th>Statut</th><th className="r">Followers</th><th className="r hide-m">Δ 7 j</th><th className="r hide-m">Vues 30 j</th><th></th></tr></thead>
+                <thead><tr><th>Compte</th><th>Statut</th><th className="r">Followers</th><th className="r hide-m">Followers Δ 7 j</th><th className="r hide-m">Vues 30 j</th><th></th></tr></thead>
                 <tbody>
                   {list.map(({a, st})=>
                     <tr key={a.id}>
@@ -593,9 +613,15 @@ function AdminApp({ settings, models, accounts, snaps, vas, refs, reload, notify
         followers,
         d7: sum(r=>r.st.d7), d30: sum(r=>r.st.d30),
         views: sum(r=>r.st.per(period).views),
+        views7: sum(r=>r.st.per("7d").views),
+        views30: sum(r=>r.st.per("30d").views),
+        dViews: sum(r=>(r.st.deltaViews ? r.st.deltaViews(period) : null)),
         reels: sum(r=>r.st.per(period).reels),
         likes, comments,
-        engagement: followers > 0 && (likes||comments) ? ((likes+comments)/followers)*100 : null,
+        engagement: (followers > 0 && (likes||comments))
+          ? (() => { const r = rows.reduce((t,x)=>t+(x.st.per(period).reels||0),0);
+                     return r > 0 ? (((likes+comments)/r)/followers)*100 : null; })()
+          : null,
       };
     }).sort((x,y)=>(y.followers||0)-(x.followers||0));
   },[models, withStats, period]);
@@ -611,7 +637,11 @@ function AdminApp({ settings, models, accounts, snaps, vas, refs, reload, notify
         name, count: list.length,
         followers: sum(r=>r.st.latest?.followers),
         d7: sum(r=>r.st.d7),
+        d30: sum(r=>r.st.d30),
         views: sum(r=>r.st.per(period).views),
+        views7: sum(r=>r.st.per("7d").views),
+        views30: sum(r=>r.st.per("30d").views),
+        dViews: sum(r=>(r.st.deltaViews ? r.st.deltaViews(period) : null)),
         reels: sum(r=>r.st.per(period).reels),
         likes: sum(r=>r.st.per(period).likes),
         comments: sum(r=>r.st.per(period).comments),
@@ -670,11 +700,14 @@ function AdminApp({ settings, models, accounts, snaps, vas, refs, reload, notify
 /* ---------- Onglet Dashboard ---------- */
 function Dashboard({ modelRows, vaRows, noModel, withStats, setDetail, models, period, setPeriod }) {
   const plabel = (PERIODS.find(p=>p.key===period)||{}).label;
+  const maxDays = withStats.reduce((m,x)=>Math.max(m, x.st.daysTracked||0), 0);
   const totals = useMemo(()=>{
     const actifs = withStats.filter(x=>x.a.status==="actif");
     const sum=(f)=>{let t=0,h=false;for(const r of actifs){const v=f(r);if(v!=null){t+=v;h=true;}}return h?t:null;};
     return { count:actifs.length, followers:sum(r=>r.st.latest?.followers), d7:sum(r=>r.st.d7),
-      views:sum(r=>r.st.per(period).views), comments:sum(r=>r.st.per(period).comments), likes:sum(r=>r.st.per(period).likes) };
+      views:sum(r=>r.st.per(period).views), comments:sum(r=>r.st.per(period).comments), likes:sum(r=>r.st.per(period).likes),
+      d30:sum(r=>r.st.d30),
+      views7:sum(r=>r.st.per("7d").views), views30:sum(r=>r.st.per("30d").views), dViews:sum(r=>(r.st.deltaViews ? r.st.deltaViews(period) : null)) };
   },[withStats, period]);
 
   return (
@@ -686,42 +719,55 @@ function Dashboard({ modelRows, vaRows, noModel, withStats, setDetail, models, p
           <tbody>
             <tr>
               <td><span className="mut">Comptes actifs</span><div className="num" style={{fontSize:22,fontWeight:700}}>{totals.count}</div></td>
-              <td><span className="mut">Followers cumulés</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.followers)}</div></td>
-              <td><span className="mut">Δ 7 jours</span><div style={{fontSize:22,fontWeight:700}}>{fmtDelta(totals.d7)}</div></td>
-              <td><span className="mut">Vues · {plabel}</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.views)}</div></td>
+              <td><span className="mut">Vues · 7 jours</span><div className="num" style={{fontSize:24,fontWeight:800,color:"var(--gold)"}}>{fmt(totals.views7)}</div></td>
+              <td><span className="mut">Vues · 30 jours</span><div className="num" style={{fontSize:24,fontWeight:800,color:"var(--gold)"}}>{fmt(totals.views30)}</div></td>
+              <td><span className="mut">Vues · {plabel} vs période précédente</span><div style={{fontSize:22,fontWeight:700}}>{fmtDelta(totals.dViews)}</div></td>
               <td><span className="mut">Commentaires · {plabel}</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.comments)}</div></td>
+              <td><span className="mut">Followers</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.followers)}</div></td>
+              <td><span className="mut">Fol. Δ 7 j / 30 j</span><div style={{fontSize:18,fontWeight:700}}>{fmtDelta(totals.d7)} <span className="mut" style={{fontSize:14}}>/</span> {fmtDelta(totals.d30)}</div></td>
             </tr>
           </tbody>
         </table>
       </div>
+
+      {maxDays < 30 &&
+        <div className="panel" style={{borderColor:"var(--gold)"}}>
+          <div style={{padding:"13px 18px",fontSize:13.5}} className="mut">
+            Historique en cours de constitution : <strong style={{color:"var(--gold)"}}>{maxDays} jour(s)</strong> de suivi.
+            Le Δ 7 jours apparaîtra au 7<sup>e</sup> jour, le Δ 30 jours au 30<sup>e</sup>. Les vues et commentaires, eux, sont déjà exacts.
+          </div>
+        </div>}
 
       <div className="panel">
         <div className="panel-head"><div className="bar"/><h2>STATS PAR MODÈLE</h2>
           <span className="hint">période : {plabel}</span></div>
         <table>
           <thead><tr>
-            <th>Modèle</th><th className="r">Comptes</th><th className="r">Followers</th>
-            <th className="r">Δ 7 j</th><th className="r hide-m">Δ 30 j</th>
-            <th className="r">Vues</th><th className="r hide-m">Reels</th>
-            <th className="r hide-m">Likes</th><th className="r">Comm.</th><th className="r hide-m">Engagement</th>
+            <th>Modèle</th><th className="r">Comptes</th>
+            <th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
+            <th className="r">Δ vues ({plabel})</th>
+            <th className="r hide-m">Reels</th><th className="r">Comm.</th>
+            <th className="r hide-m">Engagement</th>
+            <th className="r">Followers</th><th className="r">Fol. Δ 7 j</th><th className="r hide-m">Fol. Δ 30 j</th>
           </tr></thead>
           <tbody>
             {modelRows.map(r=>
               <tr key={r.model.id}>
                 <td style={{fontWeight:600}}>{r.model.name}<div className="mut" style={{fontSize:12,fontWeight:400}}>{r.count} compte(s) actif(s)</div></td>
                 <td className="r num">{r.count}</td>
-                <td className="r num" style={{fontWeight:700}}>{fmt(r.followers)}</td>
-                <td className="r">{fmtDelta(r.d7)}</td>
-                <td className="r hide-m">{fmtDelta(r.d30)}</td>
-                <td className="r num" style={{fontWeight:600}}>{fmt(r.views)}</td>
+                <td className="r num" style={{fontWeight:700,color:"var(--gold)"}}>{fmt(r.views7)}</td>
+                <td className="r num" style={{fontWeight:700}}>{fmt(r.views30)}</td>
+                <td className="r">{fmtDelta(r.dViews)}</td>
                 <td className="r num hide-m">{r.reels ?? "—"}</td>
-                <td className="r num hide-m">{fmt(r.likes)}</td>
                 <td className="r num" style={{fontWeight:600}}>{fmt(r.comments)}</td>
                 <td className="r num hide-m">{r.engagement!=null ? r.engagement.toFixed(1).replace(".",",")+" %" : "—"}</td>
+                <td className="r num" style={{fontWeight:600}}>{fmt(r.followers)}</td>
+                <td className="r">{fmtDelta(r.d7)}</td>
+                <td className="r hide-m">{fmtDelta(r.d30)}</td>
               </tr>
             )}
             {noModel > 0 &&
-              <tr><td colSpan="10" className="mut" style={{fontSize:13}}>
+              <tr><td colSpan="12" className="mut" style={{fontSize:13}}>
                 ⚠ {noModel} compte(s) actif(s) sans modèle assigné — onglet Comptes pour les assigner
               </td></tr>}
           </tbody>
@@ -733,29 +779,34 @@ function Dashboard({ modelRows, vaRows, noModel, withStats, setDetail, models, p
           <span className="hint">période : {plabel}</span></div>
         <table>
           <thead><tr>
-            <th>VA</th><th className="r">Comptes actifs</th><th className="r">Followers</th>
-            <th className="r">Δ 7 j</th><th className="r">Vues</th>
+            <th>VA</th><th className="r">Comptes actifs</th>
+            <th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
+            <th className="r">Δ vues ({plabel})</th>
             <th className="r hide-m">Reels</th><th className="r">Comm.</th>
+            <th className="r">Followers</th><th className="r">Fol. Δ 7 j</th><th className="r hide-m">Fol. Δ 30 j</th>
             <th className="r hide-m">Bannis / introuvables</th>
           </tr></thead>
           <tbody>
             {vaRows.rows.length === 0 &&
-              <tr><td colSpan="8" className="mut" style={{fontSize:13}}>
+              <tr><td colSpan="11" className="mut" style={{fontSize:13}}>
                 Aucune VA enregistrée — ajoute-les dans Réglages.
               </td></tr>}
             {vaRows.rows.map(r=>
               <tr key={r.name}>
                 <td style={{fontWeight:600}}>{r.name}</td>
                 <td className="r num">{r.count}</td>
-                <td className="r num" style={{fontWeight:700}}>{fmt(r.followers)}</td>
-                <td className="r">{fmtDelta(r.d7)}</td>
-                <td className="r num" style={{fontWeight:600}}>{fmt(r.views)}</td>
+                <td className="r num" style={{fontWeight:700,color:"var(--gold)"}}>{fmt(r.views7)}</td>
+                <td className="r num" style={{fontWeight:700}}>{fmt(r.views30)}</td>
+                <td className="r">{fmtDelta(r.dViews)}</td>
                 <td className="r num hide-m">{r.reels ?? "—"}</td>
                 <td className="r num" style={{fontWeight:600}}>{fmt(r.comments)}</td>
+                <td className="r num" style={{fontWeight:600}}>{fmt(r.followers)}</td>
+                <td className="r">{fmtDelta(r.d7)}</td>
+                <td className="r hide-m">{fmtDelta(r.d30)}</td>
                 <td className="r num hide-m">{r.bannis || "—"}</td>
               </tr>)}
             {vaRows.orphan > 0 &&
-              <tr><td colSpan="8" className="mut" style={{fontSize:13}}>
+              <tr><td colSpan="11" className="mut" style={{fontSize:13}}>
                 ⚠ {vaRows.orphan} compte(s) actif(s) sans VA assignée — onglet Comptes pour les assigner
               </td></tr>}
           </tbody>
@@ -763,19 +814,21 @@ function Dashboard({ modelRows, vaRows, noModel, withStats, setDetail, models, p
       </div>
 
       <div className="panel">
-        <div className="panel-head"><div className="bar"/><h2>TOP COMPTES (VUES 30 J)</h2></div>
+        <div className="panel-head"><div className="bar"/><h2>TOP COMPTES (VUES 7 J)</h2></div>
         <table>
-          <thead><tr><th>Compte</th><th className="hide-m">Modèle</th><th className="r">Followers</th><th className="r">Vues 30 j</th><th className="r hide-m">Moy./reel</th></tr></thead>
+          <thead><tr><th>Compte</th><th className="hide-m">Modèle</th><th className="r">Vues 7 j</th><th className="r">Vues 30 j</th><th className="r hide-m">Moy./reel</th><th className="r">Followers</th><th className="r hide-m">Fol. Δ 7 j</th></tr></thead>
           <tbody>
             {[...withStats].filter(x=>x.a.status==="actif" && x.st.latest?.views_30d!=null)
-              .sort((a,b)=>(b.st.latest.views_30d||0)-(a.st.latest.views_30d||0)).slice(0,10)
+              .sort((a,b)=>((b.st.per("7d").views ?? b.st.latest.views_30d)||0)-((a.st.per("7d").views ?? a.st.latest.views_30d)||0)).slice(0,10)
               .map(({a,st})=>
                 <tr key={a.id} className="click" onClick={()=>setDetail({a,st})}>
                   <td>@{a.username}</td>
                   <td className="hide-m mut">{models.find(m=>m.id===a.model_id)?.name || "—"}</td>
-                  <td className="r num">{fmt(st.latest?.followers)}</td>
-                  <td className="r num" style={{fontWeight:600}}>{fmt(st.latest?.views_30d)}</td>
+                  <td className="r num" style={{fontWeight:700,color:"var(--gold)"}}>{fmt(st.per("7d").views)}</td>
+                  <td className="r num" style={{fontWeight:600}}>{fmt(st.per("30d").views)}</td>
                   <td className="r num hide-m">{fmt(st.avgViews)}</td>
+                  <td className="r num" style={{fontWeight:600}}>{fmt(st.latest?.followers)}</td>
+                  <td className="r hide-m">{fmtDelta(st.d7)}</td>
                 </tr>)}
           </tbody>
         </table>
@@ -847,7 +900,7 @@ function Comptes({ withStats, models, vas, setDetail, reload, notify }) {
         <table>
           <thead><tr>
             <th>Compte</th><th>Modèle</th><th className="hide-m">VA</th><th>Statut</th>
-            <th className="r">Followers</th><th className="r hide-m">Δ 7 j</th>
+            <th className="r">Followers</th><th className="r hide-m">Followers Δ 7 j</th>
             <th className="r">Vues 30 j</th><th className="hide-m">Note</th><th className="hide-m">Créé</th>
           </tr></thead>
           <tbody>
@@ -932,7 +985,7 @@ function AccountDetail({ data, models, vas, snaps, close, reload, notify }) {
 
         <div className="row" style={{gap:22,marginBottom:14}} >
           <div><span className="mut" style={{fontSize:12.5}}>Followers</span><div className="num" style={{fontSize:20,fontWeight:700}}>{fmt(st.latest?.followers)}</div></div>
-          <div><span className="mut" style={{fontSize:12.5}}>Δ 7 j</span><div style={{fontSize:20,fontWeight:700}}>{fmtDelta(st.d7)}</div></div>
+          <div><span className="mut" style={{fontSize:12.5}}>Followers Δ 7 j</span><div style={{fontSize:20,fontWeight:700}}>{fmtDelta(st.d7)}</div></div>
           <div><span className="mut" style={{fontSize:12.5}}>Vues 30 j</span><div className="num" style={{fontSize:20,fontWeight:700}}>{fmt(st.latest?.views_30d)}</div></div>
           <div><span className="mut" style={{fontSize:12.5}}>Moy./reel</span><div className="num" style={{fontSize:20,fontWeight:700}}>{fmt(st.avgViews)}</div></div>
           <div><span className="mut" style={{fontSize:12.5}}>Âge</span><div className="num" style={{fontSize:20,fontWeight:700}}>{ageDays(a.started_on)} j</div></div>
