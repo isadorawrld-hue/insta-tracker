@@ -620,44 +620,125 @@ async function statsWindow(linkId, days) {
     : { visits: null, uniques: null, humans: null, bots: null, chunks, raw: direct.raw };
 }
 
-// Les logs portent le pays de chaque visite et les clics sur boutons.
-// On en lit quelques pages : assez pour une répartition fiable.
-async function readLogs(linkId, source, days, maxPages = 5) {
+// Tout vient des logs de visites : chaque ligne porte le pays de la visite
+// et la liste des clics effectués dessus. Une seule source, donc des chiffres
+// cohérents entre eux (vues, clics et pays partagent le même dénominateur).
+async function visitLogs(linkId, days, maxPages = 12) {
   const from = isoAt(days);
   const to = new Date().toISOString();
-  const out = [];
+  const rows = [];
   let cursor = null, lastId = null, truncated = false;
 
   for (let p = 0; p < maxPages; p++) {
-    const args = { link_id: linkId, source, from, to, limit: 100, visitor_type: "humans" };
+    const args = { link_id: linkId, source: "visits", from, to, limit: 100, visitor_type: "humans" };
     if (cursor) args.next_cursor = cursor;
     if (lastId) args.last_id = lastId;
+
     const r = await lsTool("get_link_logs", args);
-    const rows = r?.logs || r?.entries || r?.data || (Array.isArray(r) ? r : []) || [];
-    if (!Array.isArray(rows) || rows.length === 0) break;
-    out.push(...rows);
-    const np = r?.next_page || r?.pagination || {};
-    cursor = np.next_cursor || r?.next_cursor || null;
-    lastId = np.last_id || r?.last_id || null;
-    if (!cursor) break;
+    const page = Array.isArray(r?.data) ? r.data
+      : Array.isArray(r?.logs) ? r.logs
+      : Array.isArray(r?.entries) ? r.entries
+      : Array.isArray(r) ? r : [];
+    if (page.length === 0) break;
+    rows.push(...page);
+
+    const more = r?.has_more === true;
+    const np = r?.next_page || {};
+    const nc = np.next_cursor || r?.next_cursor || null;
+    const li = np.last_id || r?.last_id || null;
+    if (!more || !nc || nc === cursor) break;
+    cursor = nc; lastId = li;
+
     if (p === maxPages - 1) truncated = true;
     await new Promise((x) => setTimeout(x, 90));
   }
-  return { rows: out, truncated };
+  return { rows, truncated };
 }
 
-// Répartition par pays à partir des visites
-function countriesOf(rows) {
+// Les logs de clics portent clicked_url : on en déduit la destination.
+async function clickLogs(linkId, days, maxPages = 12) {
+  const from = isoAt(days);
+  const to = new Date().toISOString();
+  const rows = [];
+  let cursor = null, lastId = null;
+
+  for (let p = 0; p < maxPages; p++) {
+    const args = { link_id: linkId, source: "clicks", from, to, limit: 100 };
+    if (cursor) args.next_cursor = cursor;
+    if (lastId) args.last_id = lastId;
+
+    const r = await lsTool("get_link_logs", args);
+    const page = Array.isArray(r?.data) ? r.data : [];
+    if (page.length === 0) break;
+    rows.push(...page);
+
+    const more = r?.has_more === true;
+    const np = r?.next_page || {};
+    const nc = np.next_cursor || r?.next_cursor || null;
+    if (!more || !nc || nc === cursor) break;
+    cursor = nc; lastId = np.last_id || r?.last_id || null;
+    await new Promise((x) => setTimeout(x, 90));
+  }
+  return rows;
+}
+
+// Reconnaître la destination à partir de l'URL cliquée
+function destinationOf(url) {
+  const u = String(url || "").toLowerCase();
+  if (!u) return { key: "autre", label: "Autre" };
+  if (/(^|\/\/|\.)(t|telegram)\.me\b|telegram\.org|\bt\.me\b/.test(u))
+    return { key: "telegram", label: "Telegram" };
+  if (/mym\.fans|mym\.social|\bmym\b/.test(u)) return { key: "mym", label: "MYM" };
+  if (/onlyfans\.com|\bof\.\w/.test(u)) return { key: "onlyfans", label: "OnlyFans" };
+  if (/instagram\.com/.test(u)) return { key: "instagram", label: "Instagram" };
+  if (/snapchat\.com/.test(u)) return { key: "snapchat", label: "Snapchat" };
+  if (/tiktok\.com/.test(u)) return { key: "tiktok", label: "TikTok" };
+  if (/whatsapp\.com|wa\.me/.test(u)) return { key: "whatsapp", label: "WhatsApp" };
+  try {
+    const host = new URL(u).hostname.replace(/^www\./, "");
+    return { key: "autre", label: host };
+  } catch { return { key: "autre", label: "Autre" }; }
+}
+
+// Regroupe les clics par destination, en comptant aussi les personnes
+function destinations(rows) {
+  const map = new Map();
+  for (const r of rows) {
+    if (r?.spam === 1 || r?.blocked === 1 || r?.bot === true) continue;
+    const d = destinationOf(r.clicked_url);
+    const visiteur = r.stats_id || r.stats_mongo_id || r.mongo_id || r._id;
+    if (!map.has(d.key)) map.set(d.key, { key: d.key, label: d.label, clicks: 0, people: new Set() });
+    const e = map.get(d.key);
+    e.clicks += 1;
+    if (visiteur) e.people.add(String(visiteur));
+    // un libellé plus précis l'emporte sur "Autre"
+    if (e.label === "Autre" && d.label !== "Autre") e.label = d.label;
+  }
+  return [...map.values()]
+    .map((e) => ({ key: e.key, label: e.label, clicks: e.clicks, people: e.people.size }))
+    .sort((a, b) => b.people - a.people || b.clicks - a.clicks);
+}
+
+// Vues, clics et pays, calculés en une passe sur les mêmes visites
+function digest(rows) {
+  let visits = 0, clicks = 0, convertis = 0;
   const tally = new Map();
   for (const r of rows) {
-    const c = (r.country || r.country_code || r.geo?.country || "").toString().toUpperCase().trim();
-    if (!c || c.length > 3) continue;
-    tally.set(c, (tally.get(c) || 0) + 1);
+    if (r?.spam === 1 || r?.blocked === 1) continue; // trafic filtré
+    visits += 1;
+
+    const cl = Array.isArray(r.clicks) ? r.clicks.length : 0;
+    clicks += cl;
+    if (cl > 0) convertis += 1;
+
+    const c = String(r.country || "").toUpperCase().trim();
+    if (c && c.length <= 3) tally.set(c, (tally.get(c) || 0) + 1);
   }
-  return [...tally.entries()]
-    .map(([country, visits]) => ({ country, visits }))
+  const pays = [...tally.entries()]
+    .map(([country, v]) => ({ country, visits: v }))
     .sort((a, b) => b.visits - a.visits)
-    .slice(0, 12);
+    .slice(0, 15);
+  return { visits, clicks, convertis, pays };
 }
 
 export async function syncLinkScale() {
@@ -729,38 +810,47 @@ export async function syncLinkScale() {
     }
   }
 
-  // 5. Relevé : vues, clics sur boutons, pays
+  // 5. Relevé : tout depuis les logs, une seule source
   const actifs = (await sbSelect("links?select=link_id&active=eq.true&enabled=eq.true")) || [];
   let done = 0, errors = 0;
   for (const l of actifs.slice(0, 120)) {
     try {
-      const w7 = await statsWindow(l.link_id, 7);
-      const w30 = await statsWindow(l.link_id, 30);
-
-      // clics réels sur les boutons de la page
-      const c7 = await readLogs(l.link_id, "clicks", 7, 3);
-      const c30 = await readLogs(l.link_id, "clicks", 30, 5);
+      const l7 = await visitLogs(l.link_id, 7, 6);
+      const l30 = await visitLogs(l.link_id, 30, 12);
+      const d7 = digest(l7.rows);
+      const d30 = digest(l30.rows);
 
       await sbUpsert("link_stats", [{
         link_id: l.link_id, taken_on: today,
-        visits_7d: w7.visits, visits_30d: w30.visits,
-        uniques_7d: w7.uniques, uniques_30d: w30.uniques,
-        clicks_7d: c7.rows.length, clicks_30d: c30.rows.length,
-        sampled: c30.truncated,
-        raw: { w7: w7.raw, w30: w30.raw },
+        visits_7d: d7.visits, visits_30d: d30.visits,
+        // "uniques" porte ici le nombre de visiteurs ayant cliqué au moins une fois
+        uniques_7d: d7.convertis, uniques_30d: d30.convertis,
+        clicks_7d: d7.clicks, clicks_30d: d30.clicks,
+        sampled: l30.truncated,
+        raw: { pages7: l7.rows.length, pages30: l30.rows.length, tronque: l30.truncated },
       }], "link_id,taken_on");
 
-      // pays des visiteurs, sur 30 jours
-      const v30 = await readLogs(l.link_id, "visits", 30, 5);
-      const cty = countriesOf(v30.rows);
-      if (cty.length) {
+      // destinations des clics, sur les deux fenêtres
+      for (const [days, maxP] of [[7, 6], [30, 12]]) {
+        const cl = await clickLogs(l.link_id, days, maxP);
+        const dest = destinations(cl);
+        if (dest.length) {
+          await sbUpsert("link_destinations",
+            dest.map((d) => ({
+              link_id: l.link_id, taken_on: today, window_days: days,
+              destination: d.key, label: d.label, clicks: d.clicks, people: d.people,
+            })), "link_id,taken_on,window_days,destination");
+        }
+      }
+
+      if (d30.pays.length) {
         await sbUpsert("link_countries",
-          cty.map((c) => ({ link_id: l.link_id, taken_on: today, country: c.country, visits: c.visits })),
+          d30.pays.map((c) => ({ link_id: l.link_id, taken_on: today, country: c.country, visits: c.visits })),
           "link_id,taken_on,country");
       }
 
       done += 1;
-      await new Promise((r) => setTimeout(r, 120));
+      await new Promise((r) => setTimeout(r, 110));
     } catch (e) { errors += 1; console.error("LinkScale", l.link_id, e.message); }
   }
   return { dossiers: folders.length, links: rows.length, releves: done, errors };
