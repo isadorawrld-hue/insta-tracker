@@ -473,10 +473,14 @@ export async function runScan() {
     if (i + 5 < toScan.length) await new Promise((r) => setTimeout(r, 400));
   }
 
+  // Clics des liens LinkScale, dans la foulée
+  let ls = null;
+  try { ls = await syncLinkScale(); } catch (e) { ls = { error: e.message }; }
+
   await sbInsert("scan_log", [{
     accounts_scanned: toScan.length,
     errors,
-    details: JSON.stringify({ introuvables: nowGone, retrouves: recovered }).slice(0, 500),
+    details: JSON.stringify({ introuvables: nowGone, retrouves: recovered, linkscale: ls }).slice(0, 500),
   }]);
 
   // Notification Telegram (si configurée)
@@ -496,4 +500,145 @@ export function checkInternalKey(req) {
 export async function getSettings() {
   const rows = await sbSelect("app_settings?select=data&id=eq.1");
   return rows?.[0]?.data || {};
+}
+
+/* ============================================================
+   LINKSCALE — clics des liens, via leur point d'entrée MCP
+   ============================================================ */
+const LS_URL = "https://dashboard.linkscale.to/api/mcp";
+
+async function lsCall(method, params) {
+  const res = await fetch(LS_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.LINKSCALE_API_KEY || ""}`,
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method, params: params || {} }),
+  });
+  const text = await res.text();
+  let payload = text;
+  if (text.includes("data:")) {
+    const line = text.split("\n").find((l) => l.startsWith("data:"));
+    if (line) payload = line.slice(5).trim();
+  }
+  try { return JSON.parse(payload); } catch { return null; }
+}
+
+// Un appel d'outil MCP : le résultat utile est du JSON encodé en texte
+async function lsTool(name, args) {
+  const r = await lsCall("tools/call", { name, arguments: args || {} });
+  const blocks = r?.result?.content;
+  if (!Array.isArray(blocks)) return null;
+  for (const b of blocks) {
+    if (b?.type === "text" && typeof b.text === "string") {
+      try { return JSON.parse(b.text); } catch { return { text: b.text }; }
+    }
+  }
+  return null;
+}
+
+// Cherche un nombre dans une réponse dont la forme peut varier
+function pick(obj, names) {
+  if (!obj || typeof obj !== "object") return null;
+  for (const n of names) {
+    const v = obj[n];
+    if (typeof v === "number") return v;
+    if (typeof v === "string" && /^\d+$/.test(v)) return Number(v);
+  }
+  for (const v of Object.values(obj)) {
+    if (v && typeof v === "object") { const r = pick(v, names); if (r !== null) return r; }
+  }
+  return null;
+}
+
+const isoAgo = (d) => new Date(Date.now() - d * 86400000).toISOString();
+
+async function statsWindow(linkId, days) {
+  const r = await lsTool("get_link_stats", { link_id: linkId, from: isoAgo(days), to: new Date().toISOString() });
+  if (!r) return { visits: null, uniques: null, clicks: null, raw: null };
+  return {
+    visits:  pick(r, ["visits", "total_visits", "views", "total"]),
+    uniques: pick(r, ["unique_visitors", "uniques", "unique"]),
+    clicks:  pick(r, ["clicks", "button_clicks", "total_clicks"]),
+    raw: r,
+  };
+}
+
+export async function syncLinkScale() {
+  if (!process.env.LINKSCALE_API_KEY) return { skipped: "clé absente" };
+  const today = new Date().toISOString().slice(0, 10);
+
+  // 1. Dossiers — sert à deviner la VA quand le dossier porte son prénom
+  let folders = [];
+  try {
+    const f = await lsTool("list_folders", {});
+    folders = f?.folders || f?.data || (Array.isArray(f) ? f : []) || [];
+  } catch { /* pas bloquant */ }
+  const folderName = (id) => {
+    const hit = folders.find((x) => String(x._id || x.id) === String(id));
+    return hit ? (hit.name || null) : null;
+  };
+
+  // 2. Liens du projet (pagination)
+  const all = [];
+  let offset = 0;
+  for (let i = 0; i < 10; i++) {
+    const r = await lsTool("list_links", { limit: 100, offset });
+    const page = r?.links || [];
+    all.push(...page);
+    const more = r?.pagination?.has_more;
+    const returned = r?.pagination?.returned ?? page.length;
+    if (!more || returned === 0) break;
+    offset += returned;
+  }
+  if (all.length === 0) return { links: 0, note: "aucun lien trouvé" };
+
+  // 3. VA connues, pour rattacher automatiquement par nom de dossier
+  const vas = (await sbSelect("vas?select=name&active=eq.true")) || [];
+  const vaByLower = new Map(vas.map((v) => [String(v.name).toLowerCase(), v.name]));
+
+  // 4. Enregistrer / mettre à jour les liens
+  const rows = all.slice(0, 300).map((l) => {
+    const id = String(l._id || l.id);
+    const fid = Array.isArray(l.folders) ? l.folders[0] : (l.folder_id || null);
+    const fname = fid ? folderName(fid) : null;
+    return {
+      link_id: id,
+      slug: l.u || l.slug || null,
+      domain: l.domain || null,
+      url: l.url || null,
+      folder_name: fname,
+      enabled: l.enabled !== false,
+    };
+  });
+  await sbUpsert("links", rows, "link_id");
+
+  // Rattachement auto : dossier nommé comme une VA, et seulement si vide
+  for (const r of rows) {
+    const guess = r.folder_name ? vaByLower.get(String(r.folder_name).toLowerCase()) : null;
+    if (guess) {
+      await sbUpdate("links", `link_id=eq.${encodeURIComponent(r.link_id)}&va_name=is.null`, { va_name: guess });
+    }
+  }
+
+  // 5. Relever les statistiques des liens actifs
+  const actifs = (await sbSelect("links?select=link_id&active=eq.true&enabled=eq.true")) || [];
+  let done = 0, errors = 0;
+  for (const l of actifs.slice(0, 120)) {
+    try {
+      const [w7, w30] = [await statsWindow(l.link_id, 7), await statsWindow(l.link_id, 30)];
+      await sbUpsert("link_stats", [{
+        link_id: l.link_id, taken_on: today,
+        visits_7d: w7.visits, visits_30d: w30.visits,
+        uniques_7d: w7.uniques, uniques_30d: w30.uniques,
+        clicks_7d: w7.clicks, clicks_30d: w30.clicks,
+        raw: { w7: w7.raw, w30: w30.raw },
+      }], "link_id,taken_on");
+      done += 1;
+      await new Promise((r) => setTimeout(r, 120));
+    } catch (e) { errors += 1; console.error("LinkScale", l.link_id, e.message); }
+  }
+  return { links: rows.length, releves: done, errors };
 }
