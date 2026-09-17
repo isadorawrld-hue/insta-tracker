@@ -691,6 +691,9 @@ export async function syncLinkScale() {
           domain: l.domain || null,
           url: l.url || null,
           folder_name: fname,
+          // l_p = page d'atterrissage (des boutons à cliquer)
+          // d_l = lien direct (redirection immédiate, pas de bouton)
+          kind: l.type === "d_l" ? "direct" : "landing",
           enabled: l.enabled !== false,
           active: true,
         });
