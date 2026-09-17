@@ -600,70 +600,79 @@ export async function syncLinkScale() {
   if (!process.env.LINKSCALE_API_KEY) return { skipped: "clé absente" };
   const today = new Date().toISOString().slice(0, 10);
 
-  // 1. Dossiers — sert à deviner la VA quand le dossier porte son prénom
-  let folders = [];
-  try {
-    const f = await lsTool("list_folders", {});
-    folders = f?.folders || f?.data || (Array.isArray(f) ? f : []) || [];
-  } catch { /* pas bloquant */ }
-  const folderName = (id) => {
-    const hit = folders.find((x) => String(x._id || x.id) === String(id));
-    return hit ? (hit.name || null) : null;
-  };
-
-  // 2. Liens du projet (pagination)
-  const all = [];
-  let offset = 0;
-  for (let i = 0; i < 10; i++) {
-    const r = await lsTool("list_links", { limit: 100, offset });
-    const page = r?.links || [];
-    all.push(...page);
-    const more = r?.pagination?.has_more;
-    const returned = r?.pagination?.returned ?? page.length;
-    if (!more || returned === 0) break;
-    offset += returned;
+  // 1. Les dossiers LinkScale. On part d'eux : un lien sans dossier
+  //    n'est pas suivi, et le nom du dossier fait foi.
+  const fRes = await lsTool("list_folders", {});
+  const folders =
+    fRes?.folders || fRes?.data || (Array.isArray(fRes) ? fRes : []) || [];
+  if (folders.length === 0) {
+    return { links: 0, note: "aucun dossier LinkScale — rien à suivre" };
   }
-  if (all.length === 0) return { links: 0, note: "aucun lien trouvé" };
 
-  // 3. VA connues, pour rattacher automatiquement par nom de dossier
-  const vas = (await sbSelect("vas?select=name&active=eq.true")) || [];
-  const vaByLower = new Map(vas.map((v) => [String(v.name).toLowerCase(), v.name]));
+  // 2. Pour chaque dossier, ses liens (et seulement ceux-là)
+  const rows = [];
+  for (const f of folders) {
+    const fid = String(f._id || f.id || "");
+    const fname = (f.name || "").trim();
+    if (!fid || !fname) continue;
 
-  // 4. Enregistrer / mettre à jour les liens
-  const rows = all.slice(0, 300).map((l) => {
-    const id = String(l._id || l.id);
-    const fid = Array.isArray(l.folders) ? l.folders[0] : (l.folder_id || null);
-    const fname = fid ? folderName(fid) : null;
-    return {
-      link_id: id,
-      slug: l.u || l.slug || null,
-      domain: l.domain || null,
-      url: l.url || null,
-      folder_name: fname || (typeof l.note === "string" ? l.note.trim() : null) || null,
-      enabled: l.enabled !== false,
-    };
-  });
+    let offset = 0;
+    for (let p = 0; p < 5; p++) {
+      const r = await lsTool("list_links", { folder_id: fid, limit: 100, offset });
+      const page = r?.links || [];
+      for (const l of page) {
+        rows.push({
+          link_id: String(l._id || l.id),
+          slug: l.u || l.slug || null,
+          domain: l.domain || null,
+          url: l.url || null,
+          folder_name: fname,
+          enabled: l.enabled !== false,
+          active: true,
+        });
+      }
+      const returned = r?.pagination?.returned ?? page.length;
+      if (!r?.pagination?.has_more || returned === 0) break;
+      offset += returned;
+      await new Promise((r) => setTimeout(r, 80));
+    }
+  }
+  if (rows.length === 0) {
+    return { links: 0, note: "dossiers vides" };
+  }
+
   await sbUpsert("links", rows, "link_id");
 
-  // Rattachement auto : dossier nommé comme une VA, et seulement si vide
-  for (const r of rows) {
-    const guess = r.folder_name ? vaByLower.get(String(r.folder_name).toLowerCase()) : null;
-    if (guess) {
-      await sbUpdate("links", `link_id=eq.${encodeURIComponent(r.link_id)}&va_name=is.null`, { va_name: guess });
+  // 3. Les liens qui ne sont plus dans un dossier sortent du suivi
+  const known = new Set(rows.map((r) => r.link_id));
+  const existing = (await sbSelect("links?select=link_id&active=eq.true")) || [];
+  for (const e of existing) {
+    if (!known.has(e.link_id)) {
+      await sbUpdate("links", `link_id=eq.${encodeURIComponent(e.link_id)}`, { active: false });
     }
   }
 
-  // 5. Relever les statistiques des liens actifs
+  // 4. Rattachement à une VA quand le dossier porte son prénom
+  const vas = (await sbSelect("vas?select=name&active=eq.true")) || [];
+  const byLower = new Map(vas.map((v) => [String(v.name).toLowerCase(), v.name]));
+  for (const r of rows) {
+    const guess = byLower.get(r.folder_name.toLowerCase());
+    if (guess) {
+      await sbUpdate("links", `link_id=eq.${encodeURIComponent(r.link_id)}`, { va_name: guess });
+    }
+  }
+
+  // 5. Relevé des statistiques
   const actifs = (await sbSelect("links?select=link_id&active=eq.true&enabled=eq.true")) || [];
   let done = 0, errors = 0;
   for (const l of actifs.slice(0, 120)) {
     try {
-      const [w7, w30] = [await statsWindow(l.link_id, 7), await statsWindow(l.link_id, 30)];
+      const w7 = await statsWindow(l.link_id, 7);
+      const w30 = await statsWindow(l.link_id, 30);
       await sbUpsert("link_stats", [{
         link_id: l.link_id, taken_on: today,
         visits_7d: w7.visits, visits_30d: w30.visits,
         uniques_7d: w7.uniques, uniques_30d: w30.uniques,
-        // "clics" = trafic humain, hors robots
         clicks_7d: w7.humans, clicks_30d: w30.humans,
         raw: { w7: w7.raw, w30: w30.raw },
       }], "link_id,taken_on");
@@ -671,5 +680,5 @@ export async function syncLinkScale() {
       await new Promise((r) => setTimeout(r, 120));
     } catch (e) { errors += 1; console.error("LinkScale", l.link_id, e.message); }
   }
-  return { links: rows.length, releves: done, errors };
+  return { dossiers: folders.length, links: rows.length, releves: done, errors };
 }
