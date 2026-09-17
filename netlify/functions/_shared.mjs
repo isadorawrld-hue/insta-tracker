@@ -164,14 +164,24 @@ export async function fetchInstagramProfile(handle) {
   let json = null;
   try { json = JSON.parse(text); } catch { /* réponse non-JSON */ }
 
-  // Détection "compte introuvable" — uniquement sur signaux clairs
   const bodyLower = (text || "").slice(0, 2000).toLowerCase();
-  const notFound =
-    res.status === 404 ||
-    json?.success === false ||
-    /not\s*found|does\s*not\s*exist|no\s*user|user\s*not/i.test(bodyLower);
 
-  return { ok: res.ok, status: res.status, json, notFound };
+  // Instagram masque certains profils aux visiteurs non connectés.
+  // L'API répond alors "Profile is restricted" : le compte existe,
+  // mais ses statistiques sont illisibles de l'extérieur.
+  const restricted = /profile is restricted|restricted/i.test(
+    String(json?.message || "") + " " + String(json?.error || "")
+  );
+
+  // "Introuvable" : signaux clairs, et seulement si non restreint
+  const notFound =
+    !restricted && (
+      res.status === 404 ||
+      json?.success === false ||
+      /not\s*found|does\s*not\s*exist|no\s*user|user\s*not/i.test(bodyLower)
+    );
+
+  return { ok: res.ok, status: res.status, json, notFound, restricted };
 }
 
 // ---------- Appel Scrape Creators : reels (c'est ici que sont les VUES) ----------
@@ -386,12 +396,14 @@ export async function runScan() {
   const toScan = (accounts || []).filter(
     (a) =>
       a.status === "actif" ||
+      a.status === "restreint" ||
       (a.status === "introuvable" && (a.status_changed_on || today) >= threeDaysAgo)
   );
 
   let errors = 0;
   const nowGone = [];
   const recovered = [];
+  const restricted = [];
 
   // Par vagues de 5 pour rester rapide sans bourriner
   for (let i = 0; i < toScan.length; i += 5) {
@@ -400,6 +412,17 @@ export async function runScan() {
       batch.map(async (acc) => {
         try {
           const r = await fetchInstagramProfile(acc.username);
+
+          if (r.restricted) {
+            if (acc.status !== "restreint") {
+              await sbUpdate("accounts", `id=eq.${acc.id}`, {
+                status: "restreint",
+                status_changed_on: today,
+              });
+            }
+            restricted.push(acc.username);
+            return;
+          }
 
           if (r.notFound) {
             if (acc.status === "actif") {
@@ -457,7 +480,7 @@ export async function runScan() {
             "account_id,taken_on"
           );
 
-          if (acc.status === "introuvable") {
+          if (acc.status === "introuvable" || acc.status === "restreint") {
             await sbUpdate("accounts", `id=eq.${acc.id}`, {
               status: "actif",
               status_changed_on: today,
@@ -480,12 +503,13 @@ export async function runScan() {
   await sbInsert("scan_log", [{
     accounts_scanned: toScan.length,
     errors,
-    details: JSON.stringify({ introuvables: nowGone, retrouves: recovered, linkscale: ls }).slice(0, 500),
+    details: JSON.stringify({ introuvables: nowGone, restreints: restricted, retrouves: recovered, linkscale: ls }).slice(0, 500),
   }]);
 
   // Notification Telegram (si configurée)
   let msg = `📊 <b>Tracker Insta — scan terminé</b>\n${toScan.length} comptes relevés, ${errors} erreur(s).`;
   if (nowGone.length) msg += `\n⚠️ Introuvables : ${nowGone.join(", ")}`;
+  if (restricted.length) msg += `\n🔒 Restreints par Instagram : ${restricted.join(", ")}`;
   if (recovered.length) msg += `\n✅ De retour : ${recovered.join(", ")}`;
   await telegramSend(msg);
 
@@ -596,6 +620,46 @@ async function statsWindow(linkId, days) {
     : { visits: null, uniques: null, humans: null, bots: null, chunks, raw: direct.raw };
 }
 
+// Les logs portent le pays de chaque visite et les clics sur boutons.
+// On en lit quelques pages : assez pour une répartition fiable.
+async function readLogs(linkId, source, days, maxPages = 5) {
+  const from = isoAt(days);
+  const to = new Date().toISOString();
+  const out = [];
+  let cursor = null, lastId = null, truncated = false;
+
+  for (let p = 0; p < maxPages; p++) {
+    const args = { link_id: linkId, source, from, to, limit: 100, visitor_type: "humans" };
+    if (cursor) args.next_cursor = cursor;
+    if (lastId) args.last_id = lastId;
+    const r = await lsTool("get_link_logs", args);
+    const rows = r?.logs || r?.entries || r?.data || (Array.isArray(r) ? r : []) || [];
+    if (!Array.isArray(rows) || rows.length === 0) break;
+    out.push(...rows);
+    const np = r?.next_page || r?.pagination || {};
+    cursor = np.next_cursor || r?.next_cursor || null;
+    lastId = np.last_id || r?.last_id || null;
+    if (!cursor) break;
+    if (p === maxPages - 1) truncated = true;
+    await new Promise((x) => setTimeout(x, 90));
+  }
+  return { rows: out, truncated };
+}
+
+// Répartition par pays à partir des visites
+function countriesOf(rows) {
+  const tally = new Map();
+  for (const r of rows) {
+    const c = (r.country || r.country_code || r.geo?.country || "").toString().toUpperCase().trim();
+    if (!c || c.length > 3) continue;
+    tally.set(c, (tally.get(c) || 0) + 1);
+  }
+  return [...tally.entries()]
+    .map(([country, visits]) => ({ country, visits }))
+    .sort((a, b) => b.visits - a.visits)
+    .slice(0, 12);
+}
+
 export async function syncLinkScale() {
   if (!process.env.LINKSCALE_API_KEY) return { skipped: "clé absente" };
   const today = new Date().toISOString().slice(0, 10);
@@ -662,20 +726,36 @@ export async function syncLinkScale() {
     }
   }
 
-  // 5. Relevé des statistiques
+  // 5. Relevé : vues, clics sur boutons, pays
   const actifs = (await sbSelect("links?select=link_id&active=eq.true&enabled=eq.true")) || [];
   let done = 0, errors = 0;
   for (const l of actifs.slice(0, 120)) {
     try {
       const w7 = await statsWindow(l.link_id, 7);
       const w30 = await statsWindow(l.link_id, 30);
+
+      // clics réels sur les boutons de la page
+      const c7 = await readLogs(l.link_id, "clicks", 7, 3);
+      const c30 = await readLogs(l.link_id, "clicks", 30, 5);
+
       await sbUpsert("link_stats", [{
         link_id: l.link_id, taken_on: today,
         visits_7d: w7.visits, visits_30d: w30.visits,
         uniques_7d: w7.uniques, uniques_30d: w30.uniques,
-        clicks_7d: w7.humans, clicks_30d: w30.humans,
+        clicks_7d: c7.rows.length, clicks_30d: c30.rows.length,
+        sampled: c30.truncated,
         raw: { w7: w7.raw, w30: w30.raw },
       }], "link_id,taken_on");
+
+      // pays des visiteurs, sur 30 jours
+      const v30 = await readLogs(l.link_id, "visits", 30, 5);
+      const cty = countriesOf(v30.rows);
+      if (cty.length) {
+        await sbUpsert("link_countries",
+          cty.map((c) => ({ link_id: l.link_id, taken_on: today, country: c.country, visits: c.visits })),
+          "link_id,taken_on,country");
+      }
+
       done += 1;
       await new Promise((r) => setTimeout(r, 120));
     } catch (e) { errors += 1; console.error("LinkScale", l.link_id, e.message); }
