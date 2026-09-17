@@ -380,14 +380,15 @@ function Journal({ series }){
     const out = [];
     for (let i=1;i<s.length;i++){
       const a=s[i-1], b=s[i];
+      // Une différence n'a de sens qu'entre DEUX valeurs du MÊME champ.
+      // Sans repli d'un champ sur un autre : ça produirait des chiffres absurdes.
       const diff=(f)=>{ const x=b[f], y=a[f]; return (x==null||y==null) ? null : x-y; };
-      out.push({
-        date: b.taken_on,
-        views: diff("views_total") ?? diff("views_30d"),
-        followers: diff("followers"),
-        reels: diff("reels_total") ?? diff("reels_30d"),
-        totalFollowers: b.followers ?? null,
-      });
+      const views = diff("views_total");
+      const followers = diff("followers");
+      const reels = diff("reels_total");
+      // on n'affiche un jour que s'il a au moins une donnée exploitable
+      if (views===null && followers===null) continue;
+      out.push({ date: b.taken_on, views, followers, reels, totalFollowers: b.followers ?? null });
     }
     return out;
   },[series]);
@@ -447,8 +448,8 @@ function Journal({ series }){
                   fill={on?"rgba(168,85,247,.10)":"transparent"}
                   onMouseEnter={()=>setHover(i)} onClick={()=>setHover(on?null:i)} style={{cursor:"pointer"}}/>
                 <rect x={x} y={y} width={bw} height={Math.max(2,bh)} rx={Math.min(5,bw/2)}
-                  fill={v<0 ? "var(--coral)" : "url(#bar)"} opacity={hover===null||on?1:.42}
-                  style={{pointerEvents:"none"}}/>
+                  fill={d[mode]==null ? "var(--n3)" : (v<0 ? "var(--coral)" : "url(#bar)")}
+                  opacity={hover===null||on?1:.42} style={{pointerEvents:"none"}}/>
                 {(n<=14 || i%Math.ceil(n/12)===0) &&
                   <text x={padL+i*step+step/2} y={H-8} textAnchor="middle"
                     fill={on?"var(--txt)":"var(--mut-2)"} fontSize="10.5" style={{pointerEvents:"none"}}>
@@ -471,9 +472,11 @@ function Journal({ series }){
             : <>
                 <span style={{fontWeight:700,fontSize:14.5}}>{jour(days[hover].date)}</span>
                 <span style={{color:"var(--mut)",fontSize:13.5}}>
-                  {label} : <strong style={{color:"var(--txt)"}}>{fmtTxt(days[hover][mode])}</strong>
+                  {label} : {days[hover][mode]==null
+                    ? <span style={{color:"var(--mut-2)"}}>pas encore mesurable ce jour-là</span>
+                    : <strong style={{color:"var(--txt)"}}>{fmtTxt(days[hover][mode])}</strong>}
                 </span>
-                {days[hover].reels!=null && days[hover].reels>0 &&
+                {days[hover].reels!=null && days[hover].reels>0 && days[hover].reels<=12 &&
                   <span style={{color:"var(--mut)",fontSize:13.5}}>
                     {days[hover].reels} reel{days[hover].reels>1?"s":""} publié{days[hover].reels>1?"s":""}
                   </span>}
