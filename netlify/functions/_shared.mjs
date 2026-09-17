@@ -539,31 +539,61 @@ async function lsTool(name, args) {
   return null;
 }
 
-// Cherche un nombre dans une réponse dont la forme peut varier
-function pick(obj, names) {
-  if (!obj || typeof obj !== "object") return null;
-  for (const n of names) {
-    const v = obj[n];
-    if (typeof v === "number") return v;
-    if (typeof v === "string" && /^\d+$/.test(v)) return Number(v);
-  }
-  for (const v of Object.values(obj)) {
-    if (v && typeof v === "object") { const r = pick(v, names); if (r !== null) return r; }
-  }
-  return null;
+// La réponse utile est dans stats.summary :
+//   totalClicks = trafic total, uniqueUsers = visiteurs uniques,
+//   bots / spam = trafic filtré.
+function summaryOf(r) {
+  const sum = r?.stats?.summary || r?.summary || r?.data?.stats?.summary || null;
+  if (!sum) return null;
+  const n = (x) => (typeof x === "number" ? x : (typeof x === "string" && /^\d+$/.test(x) ? Number(x) : null));
+  return {
+    visits: n(sum.totalClicks) ?? n(sum.total_clicks) ?? n(sum.visits),
+    uniques: n(sum.uniqueUsers) ?? n(sum.unique_users) ?? n(sum.uniqueUsersNormal),
+    humans: n(sum.uniqueUsersNormal),
+    bots: n(sum.bots),
+    spam: n(sum.spam),
+  };
 }
 
-const isoAgo = (d) => new Date(Date.now() - d * 86400000).toISOString();
+const isoAt = (d) => new Date(Date.now() - d * 86400000).toISOString();
+
+// Une fenêtre. Au-delà d'une dizaine de jours la réponse dépasse la limite
+// de transport MCP (9 000 caractères) et LinkScale la tronque : on découpe
+// alors en tranches courtes et on additionne.
+async function statsRange(linkId, fromDays, toDays) {
+  const r = await lsTool("get_link_stats", {
+    link_id: linkId,
+    from: isoAt(fromDays),
+    to: toDays === 0 ? new Date().toISOString() : isoAt(toDays),
+  });
+  const truncated = !!(r && r.truncated_for_transport);
+  return { sum: summaryOf(r), truncated, raw: r };
+}
 
 async function statsWindow(linkId, days) {
-  const r = await lsTool("get_link_stats", { link_id: linkId, from: isoAgo(days), to: new Date().toISOString() });
-  if (!r) return { visits: null, uniques: null, clicks: null, raw: null };
-  return {
-    visits:  pick(r, ["visits", "total_visits", "views", "total"]),
-    uniques: pick(r, ["unique_visitors", "uniques", "unique"]),
-    clicks:  pick(r, ["clicks", "button_clicks", "total_clicks"]),
-    raw: r,
-  };
+  // tentative directe
+  const direct = await statsRange(linkId, days, 0);
+  if (direct.sum && !direct.truncated) {
+    return { ...direct.sum, chunks: 1, raw: direct.raw };
+  }
+  // découpage en tranches de 6 jours
+  const step = 6;
+  let visits = 0, humans = 0, bots = 0, got = false, chunks = 0;
+  for (let from = days; from > 0; from -= step) {
+    const to = Math.max(0, from - step);
+    const part = await statsRange(linkId, from, to);
+    chunks += 1;
+    if (part.sum) {
+      if (part.sum.visits != null) { visits += part.sum.visits; got = true; }
+      if (part.sum.humans != null) humans += part.sum.humans;
+      if (part.sum.bots != null) bots += part.sum.bots;
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return got
+    // les visiteurs uniques ne s'additionnent pas entre tranches : on ne les invente pas
+    ? { visits, uniques: null, humans, bots, chunks, raw: { chunked: true, chunks } }
+    : { visits: null, uniques: null, humans: null, bots: null, chunks, raw: direct.raw };
 }
 
 export async function syncLinkScale() {
@@ -609,7 +639,7 @@ export async function syncLinkScale() {
       slug: l.u || l.slug || null,
       domain: l.domain || null,
       url: l.url || null,
-      folder_name: fname,
+      folder_name: fname || (typeof l.note === "string" ? l.note.trim() : null) || null,
       enabled: l.enabled !== false,
     };
   });
@@ -633,7 +663,8 @@ export async function syncLinkScale() {
         link_id: l.link_id, taken_on: today,
         visits_7d: w7.visits, visits_30d: w30.visits,
         uniques_7d: w7.uniques, uniques_30d: w30.uniques,
-        clicks_7d: w7.clicks, clicks_30d: w30.clicks,
+        // "clics" = trafic humain, hors robots
+        clicks_7d: w7.humans, clicks_30d: w30.humans,
         raw: { w7: w7.raw, w30: w30.raw },
       }], "link_id,taken_on");
       done += 1;
