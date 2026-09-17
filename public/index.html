@@ -1166,7 +1166,7 @@ function Liens({ links, linkStats, vas, models, reload, say }){
         </select>
         <div style={{flex:1}}/>
         <span style={{color:"var(--mut)",fontSize:13.5}}>
-          {rows.length} lien{rows.length>1?"s":""} · {fmtTxt(tot.visits)} visites · {fmtTxt(tot.clicks)} clics
+          {rows.length} lien{rows.length>1?"s":""} · {fmtTxt(tot.visits)} visites · {fmtTxt(tot.clicks)} humains
         </span>
       </div>
 
@@ -1181,7 +1181,7 @@ function Liens({ links, linkStats, vas, models, reload, say }){
               <thead><tr>
                 <th>Lien</th><th>Dossier</th><th>VA</th>
                 <th className="r">Visites</th><th className="r">Visiteurs uniques</th>
-                <th className="r">Clics</th><th className="r">Taux de clic</th>
+                <th className="r">Humains</th><th className="r">Part humaine</th>
               </tr></thead>
               <tbody>{rows.map(({l,st})=>{
                 const v=st?.[`visits_${suffix}`] ?? null;
@@ -1211,7 +1211,7 @@ function Liens({ links, linkStats, vas, models, reload, say }){
             </table></div>}
       </div>
       <div style={{color:"var(--mut-2)",fontSize:13,padding:"0 4px"}}>
-        Un lien dont le dossier LinkScale porte le prénom d'une VA lui est attribué automatiquement. Sinon, choisis-la ici.
+        Un lien dont le dossier LinkScale porte le prénom d'une VA lui est attribué automatiquement, sans rien redéployer. Les visiteurs uniques ne sont pas cumulables sur 30 jours : la colonne reste vide sur cette période.
       </div>
     </div>
   );
@@ -1297,7 +1297,7 @@ function Classement({ accounts, snaps, vas, links, linkStats, me }){
             <th style={{width:44}}></th><th>VA</th><th className="r">Comptes</th>
             <th className="r">Vues 7 j</th><th className="r">Vues 15 j</th><th className="r">Vues 30 j</th>
             <th className="r">Reels</th><th className="r">Commentaires</th>
-            <th className="r">Engagement</th><th className="r">Clics liens</th>
+            <th className="r">Engagement</th><th className="r">Visites liens</th>
             <th className="r">Abonnés</th><th className="r">Δ abonnés 7 j</th>
           </tr></thead>
           <tbody>
@@ -1320,7 +1320,7 @@ function Classement({ accounts, snaps, vas, links, linkStats, me }){
                   <td className="r num">{r.reels ?? "—"}</td>
                   <td className="r"><Num n={r.comments}/></td>
                   <td className="r num">{r.eng!=null ? r.eng.toFixed(1).replace(".",",")+" %" : "—"}</td>
-                  <td className="r"><Num n={r.clicks ?? r.visits} style={{color:"var(--violet)",fontWeight:700}}/></td>
+                  <td className="r"><Num n={r.visits ?? r.clicks} style={{color:"var(--violet)",fontWeight:700}}/></td>
                   <td className="r"><Num n={r.followers}/></td>
                   <td className="r"><Delta n={r.dFol}/></td>
                 </tr>
