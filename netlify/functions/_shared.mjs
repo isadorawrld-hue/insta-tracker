@@ -176,21 +176,107 @@ export async function fetchInstagramProfile(handle) {
 
 // ---------- Appel Scrape Creators : reels (c'est ici que sont les VUES) ----------
 // L'endpoint /profile ne renvoie pas les compteurs de lectures : il faut
-// cet endpoint dédié. On passe le user_id quand on l'a (réponse plus rapide).
+// cet endpoint dédié. Il pagine via max_id — sans ça on ne récupère que la
+// première page (~12 reels), ce qui sous-estime les fenêtres 15 et 30 jours.
+// On passe le user_id quand on l'a (réponse plus rapide).
+
+// Cherche l'identifiant de page suivante, quel que soit son emplacement
+function findMaxId(json) {
+  if (!json || typeof json !== "object") return null;
+  const direct =
+    json.max_id ?? json.next_max_id ??
+    json.paging_info?.max_id ?? json.paging_info?.next_max_id ??
+    json.data?.max_id ?? json.data?.next_max_id;
+  if (direct) return String(direct);
+  const more = json.more_available ?? json.paging_info?.more_available;
+  if (more === false) return null;
+  // recherche en profondeur en dernier recours
+  const seek = (o, depth = 0) => {
+    if (!o || typeof o !== "object" || depth > 5) return null;
+    for (const k of ["next_max_id", "max_id"]) {
+      if (o[k] && typeof o[k] !== "object") return String(o[k]);
+    }
+    for (const v of Object.values(o)) {
+      if (v && typeof v === "object") { const r = seek(v, depth + 1); if (r) return r; }
+    }
+    return null;
+  };
+  return seek(json);
+}
+
+function itemsOf(json) {
+  return (Array.isArray(json?.items) && json.items) ||
+         (Array.isArray(json?.data?.items) && json.data.items) ||
+         (Array.isArray(json?.reels) && json.reels) ||
+         deepFindPosts(json) || [];
+}
+
+// Date (unix) d'un item, quelle que soit la forme de la réponse
+function itemTs(raw) {
+  const m = raw?.media || raw?.node || raw || {};
+  let ts = num(m.taken_at) ?? num(raw?.taken_at) ?? num(m.taken_at_timestamp);
+  if (ts === null) {
+    const iso = m.created_at || raw?.created_at;
+    if (typeof iso === "string") {
+      const p = Date.parse(iso);
+      if (Number.isFinite(p)) ts = Math.floor(p / 1000);
+    }
+  }
+  return ts;
+}
+
 export async function fetchInstagramReels(handle, userId) {
-  const qs = userId
+  const base = "https://api.scrapecreators.com/v1/instagram/user/reels";
+  const idPart = userId
     ? `user_id=${encodeURIComponent(userId)}`
     : `handle=${encodeURIComponent(handle)}`;
-  const url = `https://api.scrapecreators.com/v1/instagram/user/reels?${qs}`;
-  try {
-    const res = await fetch(url, { headers: { "x-api-key": SC_KEY } });
-    const text = await res.text();
+
+  const cutoff = Date.now() / 1000 - 35 * 86400; // marge au-delà des 30 j
+  const MAX_PAGES = 10;                           // couvre 30 j même à 3 reels/jour
+  const all = [];
+  let maxId = null;
+  let pages = 0;
+  let ok = false;
+  let firstJson = null;
+
+  for (let i = 0; i < MAX_PAGES; i++) {
+    const url = `${base}?${idPart}${maxId ? `&max_id=${encodeURIComponent(maxId)}` : ""}`;
     let json = null;
-    try { json = JSON.parse(text); } catch { /* ignore */ }
-    return { ok: res.ok, json };
-  } catch {
-    return { ok: false, json: null };
+    try {
+      const res = await fetch(url, { headers: { "x-api-key": SC_KEY } });
+      const text = await res.text();
+      try { json = JSON.parse(text); } catch { /* ignore */ }
+      if (!res.ok) break;
+    } catch { break; }
+
+    if (!json) break;
+    ok = true;
+    pages += 1;
+    if (!firstJson) firstJson = json;
+
+    const items = itemsOf(json);
+    if (items.length === 0) break;
+    all.push(...items);
+
+    // a-t-on dépassé la fenêtre utile ?
+    const oldest = items.reduce((min, it) => {
+      const t = itemTs(it);
+      return (t !== null && (min === null || t < min)) ? t : min;
+    }, null);
+    if (oldest !== null && oldest < cutoff) break;
+
+    const next = findMaxId(json);
+    if (!next || next === maxId) break;
+    maxId = next;
+
+    await new Promise((r) => setTimeout(r, 150)); // on n'enchaîne pas trop vite
   }
+
+  return {
+    ok,
+    pages,
+    json: ok ? { items: all, _pages: pages, _sample: firstJson?.paging_info || null } : null,
+  };
 }
 
 // Extrait l'id utilisateur de la réponse profil (pour accélérer l'appel reels)
