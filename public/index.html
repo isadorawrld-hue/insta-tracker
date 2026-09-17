@@ -316,6 +316,11 @@ function stats(account, snaps){
   };
   return { latest, tracked, d7:dFol(7), d30:dFol(30), per, dViews, series:s };
 }
+// Couleur par destination, pour les repérer d'un coup d'œil
+const DEST_COLOR = { telegram:"#2AABEE", mym:"#E1306C", onlyfans:"#00AFF0",
+  instagram:"#F9A03F", snapchat:"#FFFC00", tiktok:"#A855F7", whatsapp:"#25D366", autre:"#6F6383" };
+const destColor = (k) => DEST_COLOR[k] || DEST_COLOR.autre;
+
 // Noms de pays, codes ISO à deux lettres
 const PAYS = {AD:"Andorre",AE:"Émirats arabes unis",AF:"Afghanistan",AG:"Antigua-et-Barbuda",AI:"Anguilla",AL:"Albanie",AM:"Arménie",AO:"Angola",AQ:"Antarctique",AR:"Argentine",AS:"Samoa américaines",AT:"Autriche",AU:"Australie",AW:"Aruba",AZ:"Azerbaïdjan",BA:"Bosnie-Herzégovine",BB:"Barbade",BD:"Bangladesh",BE:"Belgique",BF:"Burkina Faso",BG:"Bulgarie",BH:"Bahreïn",BI:"Burundi",BJ:"Bénin",BL:"Saint-Barthélemy",BM:"Bermudes",BN:"Brunei",BO:"Bolivie",BR:"Brésil",BS:"Bahamas",BT:"Bhoutan",BW:"Botswana",BY:"Biélorussie",BZ:"Belize",CA:"Canada",CD:"Congo (RDC)",CF:"Centrafrique",CG:"Congo",CH:"Suisse",CI:"Côte d'Ivoire",CK:"Îles Cook",CL:"Chili",CM:"Cameroun",CN:"Chine",CO:"Colombie",CR:"Costa Rica",CU:"Cuba",CV:"Cap-Vert",CW:"Curaçao",CY:"Chypre",CZ:"Tchéquie",DE:"Allemagne",DJ:"Djibouti",DK:"Danemark",DM:"Dominique",DZ:"Algérie",EC:"Équateur",EE:"Estonie",EG:"Égypte",ER:"Érythrée",ES:"Espagne",ET:"Éthiopie",FI:"Finlande",FJ:"Fidji",FK:"Îles Malouines",FM:"Micronésie",FO:"Îles Féroé",FR:"France",GA:"Gabon",GB:"Royaume-Uni",GD:"Grenade",GE:"Géorgie",GF:"Guyane française",GG:"Guernesey",GH:"Ghana",GI:"Gibraltar",GL:"Groenland",GM:"Gambie",GN:"Guinée",GP:"Guadeloupe",GQ:"Guinée équatoriale",GR:"Grèce",GS:"Géorgie du Sud",GT:"Guatemala",GU:"Guam",GW:"Guinée-Bissau",GY:"Guyana",HK:"Hong Kong",HN:"Honduras",HR:"Croatie",HT:"Haïti",HU:"Hongrie",ID:"Indonésie",IE:"Irlande",IL:"Israël",IM:"Île de Man",IN:"Inde",IQ:"Irak",IR:"Iran",IS:"Islande",IT:"Italie",JE:"Jersey",JM:"Jamaïque",JO:"Jordanie",JP:"Japon",KE:"Kenya",KG:"Kirghizistan",KH:"Cambodge",KI:"Kiribati",KM:"Comores",KN:"Saint-Christophe-et-Niévès",KP:"Corée du Nord",KR:"Corée du Sud",KW:"Koweït",KY:"Îles Caïmans",KZ:"Kazakhstan",LA:"Laos",LB:"Liban",LC:"Sainte-Lucie",LI:"Liechtenstein",LK:"Sri Lanka",LR:"Liberia",LS:"Lesotho",LT:"Lituanie",LU:"Luxembourg",LV:"Lettonie",LY:"Libye",MA:"Maroc",MC:"Monaco",MD:"Moldavie",ME:"Monténégro",MF:"Saint-Martin",MG:"Madagascar",MH:"Îles Marshall",MK:"Macédoine du Nord",ML:"Mali",MM:"Birmanie",MN:"Mongolie",MO:"Macao",MP:"Îles Mariannes du Nord",MQ:"Martinique",MR:"Mauritanie",MS:"Montserrat",MT:"Malte",MU:"Maurice",MV:"Maldives",MW:"Malawi",MX:"Mexique",MY:"Malaisie",MZ:"Mozambique",NA:"Namibie",NC:"Nouvelle-Calédonie",NE:"Niger",NG:"Nigeria",NI:"Nicaragua",NL:"Pays-Bas",NO:"Norvège",NP:"Népal",NR:"Nauru",NU:"Niue",NZ:"Nouvelle-Zélande",OM:"Oman",PA:"Panama",PE:"Pérou",PF:"Polynésie française",PG:"Papouasie-Nouvelle-Guinée",PH:"Philippines",PK:"Pakistan",PL:"Pologne",PM:"Saint-Pierre-et-Miquelon",PR:"Porto Rico",PS:"Palestine",PT:"Portugal",PW:"Palaos",PY:"Paraguay",QA:"Qatar",RE:"La Réunion",RO:"Roumanie",RS:"Serbie",RU:"Russie",RW:"Rwanda",SA:"Arabie saoudite",SB:"Îles Salomon",SC:"Seychelles",SD:"Soudan",SE:"Suède",SG:"Singapour",SI:"Slovénie",SK:"Slovaquie",SL:"Sierra Leone",SM:"Saint-Marin",SN:"Sénégal",SO:"Somalie",SR:"Suriname",SS:"Soudan du Sud",ST:"Sao Tomé-et-Principe",SV:"Salvador",SY:"Syrie",SZ:"Eswatini",TC:"Îles Turques-et-Caïques",TD:"Tchad",TG:"Togo",TH:"Thaïlande",TJ:"Tadjikistan",TL:"Timor oriental",TM:"Turkménistan",TN:"Tunisie",TO:"Tonga",TR:"Turquie",TT:"Trinité-et-Tobago",TV:"Tuvalu",TW:"Taïwan",TZ:"Tanzanie",UA:"Ukraine",UG:"Ouganda",US:"États-Unis",UY:"Uruguay",UZ:"Ouzbékistan",VA:"Vatican",VC:"Saint-Vincent-et-les-Grenadines",VE:"Venezuela",VG:"Îles Vierges britanniques",VI:"Îles Vierges américaines",VN:"Vietnam",VU:"Vanuatu",WF:"Wallis-et-Futuna",WS:"Samoa",YE:"Yémen",YT:"Mayotte",ZA:"Afrique du Sud",ZM:"Zambie",ZW:"Zimbabwe"};
 const paysNom = (c) => PAYS[c] || (c==="XX" ? "Origine inconnue" : c);
@@ -498,6 +503,7 @@ function App(){
   const [links,setLinks] = useState([]);
   const [linkStats,setLinkStats] = useState([]);
   const [countries,setCountries] = useState([]);
+  const [dests,setDests] = useState([]);
   const [loading,setLoading] = useState(true);
   const [toast,setToast] = useState(null);
   const say = (m)=>{ setToast(m); setTimeout(()=>setToast(null),3400); };
@@ -514,7 +520,7 @@ function App(){
     const cols = "account_id,taken_on,followers,following,posts_count,"
       + "views_7d,reels_7d,likes_7d,comments_7d,views_15d,reels_15d,likes_15d,comments_15d,"
       + "views_30d,reels_30d,likes_30d,comments_30d,views_total,reels_total,likes_total,comments_total";
-    const [se,mo,ac,sn,va,rf,lk,ls,lc] = await Promise.all([
+    const [se,mo,ac,sn,va,rf,lk,ls,lc,ld] = await Promise.all([
       db.from("app_settings").select("data").eq("id",1).single(),
       db.from("models").select("*").order("name"),
       db.from("accounts").select("*").order("username"),
@@ -524,12 +530,13 @@ function App(){
       db.from("links").select("*").eq("active",true).order("slug"),
       db.from("link_stats").select("link_id,taken_on,visits_7d,visits_30d,uniques_7d,uniques_30d,clicks_7d,clicks_30d").gte("taken_on",daysAgoStr(60)).order("taken_on"),
       db.from("link_countries").select("link_id,taken_on,country,visits").gte("taken_on",daysAgoStr(10)).order("visits",{ascending:false}),
+      db.from("link_destinations").select("link_id,taken_on,window_days,destination,label,clicks,people").gte("taken_on",daysAgoStr(10)).order("people",{ascending:false}),
     ]);
     if (se.error||mo.error||ac.error||sn.error) say("Erreur de chargement des données");
     if (va.error||rf.error) say("Tables VA / références absentes — lance supabase-v2.sql");
     setSettings(se.data?.data||{}); setModels(mo.data||[]); setAccounts(ac.data||[]);
     setSnaps(sn.data||[]); setVas(va.data||[]); setRefs(rf.data||[]);
-    setLinks(lk.data||[]); setLinkStats(ls.data||[]); setCountries(lc.data||[]);
+    setLinks(lk.data||[]); setLinkStats(ls.data||[]); setCountries(lc.data||[]); setDests(ld.data||[]);
     setLoading(false);
   }
   useEffect(()=>{ load(); },[]);
@@ -546,7 +553,7 @@ function App(){
   if (loading) return <div className="gate"><div style={{color:"var(--mut)"}}>Chargement…</div></div>;
   if (!role) return <Gate onEnter={enter}/>;
   if (role==="va" && !vaName) return <PickVa vas={vas.filter(v=>v.active)} onPick={pick} back={out}/>;
-  const shared = { models, accounts, snaps, vas, refs, links, linkStats, countries, reload:load, say, out, toast };
+  const shared = { models, accounts, snaps, vas, refs, links, linkStats, countries, dests, reload:load, say, out, toast };
   return role==="admin"
     ? <Admin settings={settings} {...shared}/>
     : <Va vaName={vaName} {...shared}/>;
@@ -631,7 +638,7 @@ function Hero({ views30, views7, views15, dv7, dv30, accounts, tracked }){
 /* ============================================================
    VUE ADMIN
    ============================================================ */
-function Admin({ settings, models, accounts, snaps, vas, refs, links, linkStats, countries, reload, say, out, toast }){
+function Admin({ settings, models, accounts, snaps, vas, refs, links, linkStats, countries, dests, reload, say, out, toast }){
   const [tab,setTab] = useState("dash");
   const [period,setPeriod] = useState("30d");
   const [detail,setDetail] = useState(null);
@@ -809,7 +816,7 @@ function Admin({ settings, models, accounts, snaps, vas, refs, links, linkStats,
 
         {tab==="classement" && <Classement accounts={accounts} snaps={snaps} vas={vas} links={links} linkStats={linkStats} me={null}/>}
         {tab==="comptes" && <Comptes rows={rows} models={models} vas={vas} open={setDetail} reload={reload} say={say}/>}
-        {tab==="liens" && <Liens links={links} linkStats={linkStats} countries={countries} vas={vas} reload={reload} say={say}/>}
+        {tab==="liens" && <Liens links={links} linkStats={linkStats} countries={countries} dests={dests} vas={vas} reload={reload} say={say}/>}
         {tab==="refs" && <Refs refs={refs} admin reload={reload} say={say}/>}
         {tab==="alertes" && <Alertes alerts={alerts} open={a=>setDetail({a,st:stats(a,snaps)})}/>}
         {tab==="reglages" && <Reglages settings={settings} models={models} vas={vas} accounts={accounts} reload={reload} say={say}/>}
@@ -1265,7 +1272,7 @@ function Reglages({ settings, models, vas, accounts, reload, say }){
 /* ============================================================
    LIENS LINKSCALE
    ============================================================ */
-function Liens({ links, linkStats, countries, vas, reload, say, fixedVa }){
+function Liens({ links, linkStats, countries, dests, vas, reload, say, fixedVa }){
   const [period,setPeriod]=useState("30d");
   const [fv,setFv]=useState("");
   const [open,setOpen]=useState(null);
@@ -1279,6 +1286,16 @@ function Liens({ links, linkStats, countries, vas, reload, say, fixedVa }){
 
   const totV = rows.reduce((t,r)=>t+(r.st?.[`visits_${suffix}`]||0),0);
   const totC = rows.reduce((t,r)=>t+(r.st?.[`clicks_${suffix}`]||0),0);
+  const totK = rows.reduce((t,r)=>t+(r.st?.[`uniques_${suffix}`]||0),0);
+
+  // destinations du dernier relevé, pour un lien et la fenêtre choisie
+  const destsDe = (linkId) => {
+    const w = period==="7d" ? 7 : 30;
+    const all = (dests||[]).filter(d=>d.link_id===linkId && d.window_days===w);
+    if (all.length===0) return [];
+    const last = all.reduce((m,d)=>d.taken_on>m?d.taken_on:m, all[0].taken_on);
+    return all.filter(d=>d.taken_on===last).sort((a,b)=>b.people-a.people);
+  };
 
   // pays du dernier relevé, pour un lien
   const paysDe = (linkId) => {
@@ -1301,7 +1318,7 @@ function Liens({ links, linkStats, countries, vas, reload, say, fixedVa }){
           </select>}
         <div style={{flex:1}}/>
         <span style={{color:"var(--mut)",fontSize:13.5}}>
-          {rows.length} lien{rows.length>1?"s":""} · {fmtTxt(totV)} vues · {fmtTxt(totC)} clics
+          {rows.length} lien{rows.length>1?"s":""} · {fmtTxt(totV)} vues · {fmtTxt(totK)} ont cliqué {totV>0 ? `(${((totK/totV)*100).toFixed(0)} %)` : ""}
         </span>
       </div>
 
@@ -1317,13 +1334,17 @@ function Liens({ links, linkStats, countries, vas, reload, say, fixedVa }){
           : <div className="scroll"><table>
               <thead><tr>
                 <th style={{width:30}}></th><th>Dossier</th>{!fixedVa && <th>VA</th>}
-                <th className="r">Vues du lien</th><th className="r">Clics</th><th className="r">Taux de clic</th>
+                <th className="r">Vues du lien</th><th className="r">Ont cliqué</th>
+                <th className="r">Telegram</th><th className="r">MYM</th>
+                <th className="r">Taux de clic</th>
               </tr></thead>
               <tbody>{rows.map(({l,st})=>{
                 const v=st?.[`visits_${suffix}`] ?? null;
                 const c=st?.[`clicks_${suffix}`] ?? null;
                 const direct = l.kind==="direct";
-                const ctr=(!direct && v>0 && c!=null) ? (c/v)*100 : null;
+                const conv = st?.[`uniques_${suffix}`] ?? null;   // visiteurs ayant cliqué
+                const dd = destsDe(l.link_id);
+                const ctr=(!direct && v>0 && conv!=null) ? (conv/v)*100 : null;
                 const isOpen = open===l.link_id;
                 const pays = isOpen ? paysDe(l.link_id) : [];
                 return (
@@ -1347,15 +1368,46 @@ function Liens({ links, linkStats, countries, vas, reload, say, fixedVa }){
                       <td className="r"><Num n={v} style={{fontWeight:700}}/></td>
                       <td className="r">{direct
                         ? <span style={{color:"var(--mut-2)",fontSize:12.5}}>redirection</span>
-                        : <Num n={c} style={{color:"var(--violet)",fontWeight:700}}/>}</td>
-                      <td className="r num" style={{fontWeight:600}}>
+                        : <Num n={conv} style={{color:"var(--violet)",fontWeight:700}}/>}</td>
+                      <td className="r">{direct ? <span style={{color:"var(--mut-2)"}}>—</span>
+                        : <Num n={(dd.find(x=>x.destination==="telegram")||{}).people}
+                            style={{color:"#2AABEE",fontWeight:700}}/>}</td>
+                      <td className="r">{direct ? <span style={{color:"var(--mut-2)"}}>—</span>
+                        : <Num n={(dd.find(x=>x.destination==="mym")||{}).people}
+                            style={{color:"#E1306C",fontWeight:700}}/>}</td>
+                      <td className="r num" style={{fontWeight:600,
+                        color: ctr!=null ? (ctr>=25?"var(--mint)":ctr>=12?"var(--txt)":"var(--amber)") : "var(--mut-2)"}}>
                         {ctr!=null ? ctr.toFixed(1).replace(".",",")+" %" : "—"}</td>
                     </tr>
                     {isOpen &&
-                      <tr><td colSpan={fixedVa?5:6} style={{background:"var(--n0)",padding:"16px 20px"}}>
+                      <tr><td colSpan={fixedVa?7:8} style={{background:"var(--n0)",padding:"18px 20px"}}>
+                        {dd.length>0 &&
+                          <div style={{marginBottom:20}}>
+                            <div style={{color:"var(--mut)",fontSize:12.5,marginBottom:10}}>
+                              Où partent les visiteurs
+                            </div>
+                            {dd.map(d=>{
+                              const part = conv>0 ? (d.people/conv)*100 : null;
+                              return (
+                                <div key={d.destination} style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+                                  <div style={{width:130,fontSize:13.5,fontWeight:700,color:destColor(d.destination)}}>
+                                    {d.label}</div>
+                                  <div style={{flex:1,height:8,borderRadius:99,background:"var(--n3)",overflow:"hidden",maxWidth:340}}>
+                                    <div style={{width:(part!=null?Math.min(100,part):0)+"%",height:"100%",
+                                      borderRadius:99,background:destColor(d.destination)}}/>
+                                  </div>
+                                  <div className="num" style={{width:120,textAlign:"right",fontWeight:700}}>
+                                    {d.people} personne{d.people>1?"s":""}</div>
+                                  <div className="num" style={{width:78,textAlign:"right",color:"var(--mut-2)",fontSize:13}}>
+                                    {d.clicks} clic{d.clicks>1?"s":""}</div>
+                                </div>
+                              );
+                            })}
+                          </div>}
+
                         {pays.length===0
                           ? <div style={{color:"var(--mut-2)",fontSize:13.5}}>
-                              Pas encore de données de pays pour ce lien. Elles arrivent au prochain relevé.
+                              {dd.length>0 ? "Les pays arrivent au prochain relevé." : "Pas encore de données pour ce lien. Elles arrivent au prochain relevé."}
                             </div>
                           : <div>
                               <div style={{color:"var(--mut)",fontSize:12.5,marginBottom:10}}>
@@ -1518,7 +1570,7 @@ function Classement({ accounts, snaps, vas, links, linkStats, me }){
 /* ============================================================
    VUE VA
    ============================================================ */
-function Va({ models, accounts, snaps, refs, vas, links, linkStats, countries, vaName, reload, say, out, toast }){
+function Va({ models, accounts, snaps, refs, vas, links, linkStats, countries, dests, vaName, reload, say, out, toast }){
   const [tab,setTab]=useState("mes");
   const [detail,setDetail]=useState(null);
   const mine = accounts.filter(a=>a.active && a.status!=="supprime" && a.va_name===vaName);
@@ -1569,7 +1621,7 @@ function Va({ models, accounts, snaps, refs, vas, links, linkStats, countries, v
       <div className="wrap">
         {tab==="refs" && <Refs refs={refs} admin={false} reload={reload} say={say}/>}
         {tab==="classement" && <Classement accounts={accounts} snaps={snaps} vas={vas} links={links} linkStats={linkStats} me={vaName}/>}
-        {tab==="liens" && <Liens links={links} linkStats={linkStats} countries={countries} vas={vas} reload={reload} say={say} fixedVa={vaName}/>}
+        {tab==="liens" && <Liens links={links} linkStats={linkStats} countries={countries} dests={dests} vas={vas} reload={reload} say={say} fixedVa={vaName}/>}
 
         {tab==="mes" && <>
           <Hero views30={tot.views30} views7={tot.views7} views15={tot.views15}
@@ -1581,9 +1633,9 @@ function Va({ models, accounts, snaps, refs, vas, links, linkStats, countries, v
                 <span className="hint">clique pour le détail par pays dans l'onglet Mes liens</span></div>
               <div className="scroll"><table style={{minWidth:520}}>
                 <thead><tr><th>Dossier</th><th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
-                  <th className="r">Clics 30 j</th><th className="r">Taux de clic</th></tr></thead>
+                  <th className="r">Ont cliqué</th><th className="r">Taux de clic</th></tr></thead>
                 <tbody>{mesLiens.map(({l,st})=>{
-                  const v=st?.visits_30d ?? null, c=st?.clicks_30d ?? null;
+                  const v=st?.visits_30d ?? null, c=st?.uniques_30d ?? null;
                   const ctr=(v>0 && c!=null) ? (c/v)*100 : null;
                   return (
                     <tr key={l.link_id} className="tap" onClick={()=>setTab("liens")}>
@@ -1593,8 +1645,15 @@ function Va({ models, accounts, snaps, refs, vas, links, linkStats, countries, v
                       <td className="r"><Num n={v} style={{fontWeight:700}}/></td>
                       <td className="r">{direct
                         ? <span style={{color:"var(--mut-2)",fontSize:12.5}}>redirection</span>
-                        : <Num n={c} style={{color:"var(--violet)",fontWeight:700}}/>}</td>
-                      <td className="r num" style={{fontWeight:600}}>
+                        : <Num n={conv} style={{color:"var(--violet)",fontWeight:700}}/>}</td>
+                      <td className="r">{direct ? <span style={{color:"var(--mut-2)"}}>—</span>
+                        : <Num n={(dd.find(x=>x.destination==="telegram")||{}).people}
+                            style={{color:"#2AABEE",fontWeight:700}}/>}</td>
+                      <td className="r">{direct ? <span style={{color:"var(--mut-2)"}}>—</span>
+                        : <Num n={(dd.find(x=>x.destination==="mym")||{}).people}
+                            style={{color:"#E1306C",fontWeight:700}}/>}</td>
+                      <td className="r num" style={{fontWeight:600,
+                        color: ctr!=null ? (ctr>=25?"var(--mint)":ctr>=12?"var(--txt)":"var(--amber)") : "var(--mut-2)"}}>
                         {ctr!=null ? ctr.toFixed(1).replace(".",",")+" %" : "—"}</td>
                     </tr>);
                 })}</tbody>
