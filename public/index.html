@@ -50,7 +50,7 @@
   /* chiffres : jamais coupés, toujours alignés */
   .num{font-variant-numeric:tabular-nums; white-space:nowrap}
   .val{font-family:'Bricolage Grotesque',Inter,sans-serif; font-variant-numeric:tabular-nums; white-space:nowrap; letter-spacing:-.02em}
-  .unit{font-size:.62em; font-weight:600; margin-left:.12em; color:var(--mut)}
+  .unit{font-size:.58em; font-weight:700; margin-left:.1em; vertical-align:.14em; color:var(--mut); letter-spacing:0}
 
   .grad-txt{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 
@@ -234,6 +234,11 @@ function Num({ n, className="", style }){
   return <span className={"val "+className} style={style}>{s.v}{s.u && <span className="unit">{s.u}</span>}</span>;
 }
 const fmtTxt = (n) => { const s = split(n); return s ? s.v + (s.u ? " " + s.u : "") : "—"; };
+// Objectifs de palier : ronds par nature, on retire la décimale (500 k, pas 500,0 k)
+const fmtGoal = (n) => { const s = split(n); if(!s) return "—";
+  return s.v.replace(/,0$/,"") + (s.u ? " " + s.u : ""); };
+// Accord singulier / pluriel
+const plural = (n, one, many) => `${n} ${n>1?many:one}`;
 
 function Delta({ n, suffix }){
   if (n === null || n === undefined) return <span className="pill flat">—</span>;
@@ -310,6 +315,24 @@ function stats(account, snaps){
   };
   return { latest, tracked, d7:dFol(7), d30:dFol(30), per, dViews, series:s };
 }
+// Dernier relevé connu d'un lien
+function lastLinkStat(linkId, linkStats){
+  const s = linkStats.filter(x=>x.link_id===linkId).sort((a,b)=>a.taken_on<b.taken_on?-1:1);
+  return s[s.length-1] || null;
+}
+// Clics cumulés d'un ensemble de liens
+function clicksOf(links, linkStats, period){
+  const suffix = period==="7d" ? "7d" : "30d";
+  let v=0,u=0,c=0,has=false;
+  for(const l of links){
+    const st = lastLinkStat(l.link_id, linkStats);
+    if(!st) continue;
+    if(st[`visits_${suffix}`]!=null){ v+=st[`visits_${suffix}`]; has=true; }
+    if(st[`uniques_${suffix}`]!=null){ u+=st[`uniques_${suffix}`]; has=true; }
+    if(st[`clicks_${suffix}`]!=null){ c+=st[`clicks_${suffix}`]; has=true; }
+  }
+  return has ? { visits:v, uniques:u, clicks:c } : { visits:null, uniques:null, clicks:null };
+}
 const sumOf = (rows, f) => { let t=0,h=false; for(const r of rows){ const v=f(r); if(v!=null){t+=v;h=true;} } return h?t:null; };
 
 /* ---------- petits composants ---------- */
@@ -371,6 +394,8 @@ function App(){
   const [snaps,setSnaps] = useState([]);
   const [vas,setVas] = useState([]);
   const [refs,setRefs] = useState([]);
+  const [links,setLinks] = useState([]);
+  const [linkStats,setLinkStats] = useState([]);
   const [loading,setLoading] = useState(true);
   const [toast,setToast] = useState(null);
   const say = (m)=>{ setToast(m); setTimeout(()=>setToast(null),3400); };
@@ -387,18 +412,21 @@ function App(){
     const cols = "account_id,taken_on,followers,following,posts_count,"
       + "views_7d,reels_7d,likes_7d,comments_7d,views_15d,reels_15d,likes_15d,comments_15d,"
       + "views_30d,reels_30d,likes_30d,comments_30d,views_total,reels_total,likes_total,comments_total";
-    const [se,mo,ac,sn,va,rf] = await Promise.all([
+    const [se,mo,ac,sn,va,rf,lk,ls] = await Promise.all([
       db.from("app_settings").select("data").eq("id",1).single(),
       db.from("models").select("*").order("name"),
       db.from("accounts").select("*").order("username"),
       db.from("snapshots").select(cols).gte("taken_on",daysAgoStr(60)).order("taken_on"),
       db.from("vas").select("*").order("name"),
       db.from("ref_accounts").select("*").order("username"),
+      db.from("links").select("*").eq("active",true).order("slug"),
+      db.from("link_stats").select("link_id,taken_on,visits_7d,visits_30d,uniques_7d,uniques_30d,clicks_7d,clicks_30d").gte("taken_on",daysAgoStr(60)).order("taken_on"),
     ]);
     if (se.error||mo.error||ac.error||sn.error) say("Erreur de chargement des données");
     if (va.error||rf.error) say("Tables VA / références absentes — lance supabase-v2.sql");
     setSettings(se.data?.data||{}); setModels(mo.data||[]); setAccounts(ac.data||[]);
     setSnaps(sn.data||[]); setVas(va.data||[]); setRefs(rf.data||[]);
+    setLinks(lk.data||[]); setLinkStats(ls.data||[]);
     setLoading(false);
   }
   useEffect(()=>{ load(); },[]);
@@ -415,7 +443,7 @@ function App(){
   if (loading) return <div className="gate"><div style={{color:"var(--mut)"}}>Chargement…</div></div>;
   if (!role) return <Gate onEnter={enter}/>;
   if (role==="va" && !vaName) return <PickVa vas={vas.filter(v=>v.active)} onPick={pick} back={out}/>;
-  const shared = { models, accounts, snaps, vas, refs, reload:load, say, out, toast };
+  const shared = { models, accounts, snaps, vas, refs, links, linkStats, reload:load, say, out, toast };
   return role==="admin"
     ? <Admin settings={settings} {...shared}/>
     : <Va vaName={vaName} {...shared}/>;
@@ -468,7 +496,7 @@ function Hero({ views30, views7, views15, dv7, dv30, accounts, tracked }){
         <div className="tier">
           <div className="tier-top">
             <span className="tier-name">{t.cur.name}</span>
-            {t.next && <span className="tier-goal">vers {fmtTxt(t.next.at)}</span>}
+            {t.next && <span className="tier-goal">vers {fmtGoal(t.next.at)}</span>}
           </div>
           <div className="track"><div className="fill" style={{width:w+"%"}}/></div>
           <div className="tier-msg">{t.cur.msg}</div>
@@ -487,7 +515,7 @@ function Hero({ views30, views7, views15, dv7, dv30, accounts, tracked }){
         </div>
         <div className="cell">
           <div className="cell-l">Historique</div>
-          <div className="cell-v"><Num n={tracked}/> <span style={{fontSize:14,color:"var(--mut)"}}>j</span></div>
+          <div className="cell-v"><Num n={tracked}/> <span style={{fontSize:14,color:"var(--mut)"}}>{tracked>1?"jours":"jour"}</span></div>
           <div className="cell-d" style={{color:"var(--mut-2)",fontSize:12.5}}>
             {tracked>=30 ? "toutes les comparaisons sont actives" : "les Δ s'activent à 7 puis 30 jours"}
           </div>
@@ -500,7 +528,7 @@ function Hero({ views30, views7, views15, dv7, dv30, accounts, tracked }){
 /* ============================================================
    VUE ADMIN
    ============================================================ */
-function Admin({ settings, models, accounts, snaps, vas, refs, reload, say, out, toast }){
+function Admin({ settings, models, accounts, snaps, vas, refs, links, linkStats, reload, say, out, toast }){
   const [tab,setTab] = useState("dash");
   const [period,setPeriod] = useState("30d");
   const [detail,setDetail] = useState(null);
@@ -558,7 +586,7 @@ function Admin({ settings, models, accounts, snaps, vas, refs, reload, say, out,
       if(a.status==="actif" && ageDays(a.started_on)>=14){
         const m=st.per("30d");
         if(m.avg!==null && m.avg<seuil)
-          out.push({t:"eval",a,txt:`${ageDays(a.started_on)} jours, ${fmtTxt(m.avg)} vues en moyenne par reel (seuil ${fmtTxt(seuil)}). À supprimer et refaire ?`});
+          out.push({t:"eval",a,txt:`${plural(ageDays(a.started_on),"jour","jours")}, ${fmtTxt(m.avg)} vues en moyenne par reel (seuil ${fmtTxt(seuil)}). À supprimer et refaire ?`});
       }
       if(a.status==="actif" && ageDays(a.started_on)>=7 && st.latest && st.latest.reels_7d===0)
         out.push({t:"muet",a,txt:"Aucun reel publié depuis 7 jours. Le compte est-il bien traité ?"});
@@ -566,7 +594,7 @@ function Admin({ settings, models, accounts, snaps, vas, refs, reload, say, out,
     return out;
   },[rows,seuil]);
 
-  const NAV=[["dash","Tableau de bord"],["comptes","Comptes"],["refs","Comptes à suivre"],
+  const NAV=[["dash","Tableau de bord"],["classement","Classement"],["comptes","Comptes"],["liens","Liens"],["refs","Comptes à suivre"],
              ["alertes",`Alertes${alerts.length?` · ${alerts.length}`:""}`],["reglages","Réglages"]];
 
   return (
@@ -675,7 +703,9 @@ function Admin({ settings, models, accounts, snaps, vas, refs, reload, say, out,
           </div>
         </>}
 
+        {tab==="classement" && <Classement accounts={accounts} snaps={snaps} vas={vas} links={links} linkStats={linkStats} me={null}/>}
         {tab==="comptes" && <Comptes rows={rows} models={models} vas={vas} open={setDetail} reload={reload} say={say}/>}
+        {tab==="liens" && <Liens links={links} linkStats={linkStats} vas={vas} models={models} reload={reload} say={say}/>}
         {tab==="refs" && <Refs refs={refs} admin reload={reload} say={say}/>}
         {tab==="alertes" && <Alertes alerts={alerts} open={a=>setDetail({a,st:stats(a,snaps)})}/>}
         {tab==="reglages" && <Reglages settings={settings} models={models} vas={vas} accounts={accounts} reload={reload} say={say}/>}
@@ -803,7 +833,7 @@ function Comptes({ rows, models, vas, open, reload, say }){
                 <td className="r"><Num n={st.latest?.followers}/></td>
                 <td className="r"><Delta n={st.d7}/></td>
                 <td onClick={e=>e.stopPropagation()}><Stars value={a.rating} onChange={r=>set(a,{rating:r})}/></td>
-                <td className="r num" style={{color:"var(--mut)"}}>{ageDays(a.started_on)} j</td>
+                <td className="r num" style={{color:"var(--mut)"}}>{plural(ageDays(a.started_on),"j","j")}</td>
               </tr>)}
           </tbody>
         </table></div>
@@ -928,11 +958,11 @@ function Detail({ data, models, vas, snaps, close, reload, say }){
               <div className="hero-num grad-txt" style={{fontSize:"clamp(38px,8vw,56px)"}}>
                 <Num n={st.per("30d").views}/></div>
               <div className="hero-sub"><Delta n={st.dViews("30d")}/>
-                <span style={{color:"var(--mut-2)"}}>{ageDays(a.started_on)} jours d'existence</span></div>
+                <span style={{color:"var(--mut-2)"}}>{plural(ageDays(a.started_on),"jour d'existence","jours d'existence")}</span></div>
             </div>
             <div className="tier">
               <div className="tier-top"><span className="tier-name">{t.cur.name}</span>
-                {t.next && <span className="tier-goal">vers {fmtTxt(t.next.at)}</span>}</div>
+                {t.next && <span className="tier-goal">vers {fmtGoal(t.next.at)}</span>}</div>
               <div className="track"><div className="fill" style={{width:t.pct+"%"}}/></div>
             </div>
           </div>
@@ -1114,9 +1144,202 @@ function Reglages({ settings, models, vas, accounts, reload, say }){
 }
 
 /* ============================================================
+   LIENS LINKSCALE
+   ============================================================ */
+function Liens({ links, linkStats, vas, models, reload, say }){
+  const [period,setPeriod]=useState("30d");
+  const [fv,setFv]=useState("");
+  const suffix = period==="7d" ? "7d" : "30d";
+  const rows = (links||[]).filter(l=>!fv || (fv==="none" ? !l.va_name : l.va_name===fv))
+    .map(l=>({ l, st:lastLinkStat(l.link_id, linkStats||[]) }))
+    .sort((a,b)=>((b.st?.[`visits_${suffix}`]||0)-(a.st?.[`visits_${suffix}`]||0)));
+  const set = async (l,patch)=>{ await db.from("links").update(patch).eq("link_id",l.link_id); reload(); };
+  const tot = clicksOf(rows.map(r=>r.l), linkStats||[], suffix);
+
+  return (
+    <div>
+      <div className="row" style={{marginBottom:14}}>
+        <Seg value={period} onChange={setPeriod} options={[{key:"7d",label:"7 jours"},{key:"30d",label:"30 jours"}]}/>
+        <select value={fv} onChange={e=>setFv(e.target.value)} style={{maxWidth:170}}>
+          <option value="">Toutes les VA</option><option value="none">Sans VA</option>
+          {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+        </select>
+        <div style={{flex:1}}/>
+        <span style={{color:"var(--mut)",fontSize:13.5}}>
+          {rows.length} lien{rows.length>1?"s":""} · {fmtTxt(tot.visits)} visites · {fmtTxt(tot.clicks)} clics
+        </span>
+      </div>
+
+      <div className="panel">
+        <div className="ph"><h2>Liens suivis</h2>
+          <span className="hint">synchronisés depuis LinkScale à chaque relevé</span></div>
+        {rows.length===0
+          ? <div className="empty">
+              Aucun lien pour l'instant. Lance un relevé dans Réglages : les liens de ton projet LinkScale seront importés.
+            </div>
+          : <div className="scroll"><table>
+              <thead><tr>
+                <th>Lien</th><th>Dossier</th><th>VA</th>
+                <th className="r">Visites</th><th className="r">Visiteurs uniques</th>
+                <th className="r">Clics</th><th className="r">Taux de clic</th>
+              </tr></thead>
+              <tbody>{rows.map(({l,st})=>{
+                const v=st?.[`visits_${suffix}`] ?? null;
+                const u=st?.[`uniques_${suffix}`] ?? null;
+                const c=st?.[`clicks_${suffix}`] ?? null;
+                const ctr=(v>0 && c!=null) ? (c/v)*100 : null;
+                return (
+                  <tr key={l.link_id}>
+                    <td>
+                      <div className="who">{l.slug || l.link_id}</div>
+                      {l.domain && <div className="sub">{l.domain}</div>}
+                    </td>
+                    <td style={{color:"var(--mut)"}}>{l.folder_name || "—"}</td>
+                    <td>
+                      <select value={l.va_name||""} onChange={e=>set(l,{va_name:e.target.value||null})}
+                        style={{padding:"6px 9px",fontSize:13,width:130}}>
+                        <option value="">—</option>
+                        {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+                      </select></td>
+                    <td className="r"><Num n={v} style={{fontWeight:700}}/></td>
+                    <td className="r"><Num n={u}/></td>
+                    <td className="r"><Num n={c} style={{color:"var(--violet)",fontWeight:700}}/></td>
+                    <td className="r num">{ctr!=null ? ctr.toFixed(1).replace(".",",")+" %" : "—"}</td>
+                  </tr>
+                );
+              })}</tbody>
+            </table></div>}
+      </div>
+      <div style={{color:"var(--mut-2)",fontSize:13,padding:"0 4px"}}>
+        Un lien dont le dossier LinkScale porte le prénom d'une VA lui est attribué automatiquement. Sinon, choisis-la ici.
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   CLASSEMENT DES VA — visible par tout le monde
+   Totaux uniquement : jamais le détail des comptes des autres.
+   ============================================================ */
+function Classement({ accounts, snaps, vas, links, linkStats, me }){
+  const [period,setPeriod] = useState("30d");
+  const rows = useMemo(()=>{
+    const live = accounts.filter(a=>a.active && a.status==="actif" && a.va_name);
+    const withSt = live.map(a=>({a, st:stats(a,snaps)}));
+    const names = new Set(withSt.map(r=>r.a.va_name));
+    (vas||[]).filter(v=>v.active).forEach(v=>names.add(v.name));
+    return [...names].map(name=>{
+      const g = withSt.filter(r=>r.a.va_name===name);
+      const likes = sumOf(g,r=>r.st.per(period).likes)||0;
+      const comments = sumOf(g,r=>r.st.per(period).comments)||0;
+      const reels = sumOf(g,r=>r.st.per(period).reels)||0;
+      const followers = sumOf(g,r=>r.st.latest?.followers);
+      const myLinks = (links||[]).filter(l=>l.va_name===name);
+      const cl = clicksOf(myLinks, linkStats||[], period==="7d"?"7d":"30d");
+      return { name, count:g.length, nbLinks:myLinks.length,
+        clicks:cl.clicks, visits:cl.visits, uniques:cl.uniques,
+        v7:sumOf(g,r=>r.st.per("7d").views),
+        v15:sumOf(g,r=>r.st.per("15d").views),
+        v30:sumOf(g,r=>r.st.per("30d").views),
+        views:sumOf(g,r=>r.st.per(period).views),
+        comments, reels, followers,
+        dFol:sumOf(g,r=>r.st.d7),
+        eng:(followers>0 && reels>0 && (likes||comments))
+          ? (((likes+comments)/reels)/followers)*100 : null };
+    }).sort((a,b)=>(b.v30||0)-(a.v30||0));
+  },[accounts,snaps,vas,period]);
+
+  const total = sumOf(rows,r=>r.v30);
+  const mine = rows.find(r=>r.name===me);
+  const rank = mine ? rows.indexOf(mine)+1 : null;
+
+  return (
+    <div>
+      {me && rank && rows.length>1 &&
+        <div className="hero" style={{marginBottom:16}}>
+          <div className="hero-in" style={{padding:"22px 24px 20px"}}>
+            <div className="hero-main">
+              <div className="hero-label">Ta place ce mois-ci</div>
+              <div className="hero-num grad-txt" style={{fontSize:"clamp(40px,8vw,64px)"}}>
+                {rank}<span className="unit" style={{fontSize:".4em"}}>
+                  {rank===1?"re":"e"} sur {rows.length}</span></div>
+              <div className="hero-sub">
+                <span style={{color:"var(--mut-2)"}}>
+                  {rank===1
+                    ? "Tu es en tête. Garde le rythme."
+                    : `${fmtTxt((rows[rank-2].v30||0)-(mine.v30||0))} vues te séparent de la place au-dessus.`}
+                </span>
+              </div>
+            </div>
+            <div className="tier">
+              <div className="tier-top">
+                <span className="tier-name">Tes vues sur 30 jours</span>
+                <span className="tier-goal">{fmtTxt(mine.v30)}</span>
+              </div>
+              <div className="track">
+                <div className="fill" style={{width:(total>0?Math.min(100,((mine.v30||0)/total)*100):0)+"%"}}/>
+              </div>
+              <div className="tier-msg">
+                {total>0 ? `${Math.round(((mine.v30||0)/total)*100)} % des vues de l'équipe` : "En attente du premier relevé"}
+              </div>
+            </div>
+          </div>
+        </div>}
+
+      <div className="panel">
+        <div className="ph">
+          <h2>Classement de l'équipe</h2>
+          <div style={{flex:1}}/>
+          <Seg value={period} onChange={setPeriod} options={PERIODS.filter(p=>p.key!=="total")}/>
+        </div>
+        <div className="scroll"><table>
+          <thead><tr>
+            <th style={{width:44}}></th><th>VA</th><th className="r">Comptes</th>
+            <th className="r">Vues 7 j</th><th className="r">Vues 15 j</th><th className="r">Vues 30 j</th>
+            <th className="r">Reels</th><th className="r">Commentaires</th>
+            <th className="r">Engagement</th><th className="r">Clics liens</th>
+            <th className="r">Abonnés</th><th className="r">Δ abonnés 7 j</th>
+          </tr></thead>
+          <tbody>
+            {rows.length===0 && <tr><td colSpan="12" className="empty">
+              Le classement apparaîtra dès que des comptes seront assignés.</td></tr>}
+            {rows.map((r,i)=>{
+              const isMe = r.name===me;
+              return (
+                <tr key={r.name} style={isMe?{background:"rgba(168,85,247,.09)"}:undefined}>
+                  <td className="num" style={{color:i===0?"var(--amber)":"var(--mut-2)",fontWeight:700}}>{i+1}</td>
+                  <td>
+                    <span className="who">{r.name}</span>
+                    {isMe && <span className="chip c-actif" style={{marginLeft:8}}>toi</span>}
+                    <div className="sub">{r.count} compte{r.count>1?"s":""}</div>
+                  </td>
+                  <td className="r num">{r.count}</td>
+                  <td className="r"><Num n={r.v7} style={{color:"var(--amber)",fontWeight:700}}/></td>
+                  <td className="r"><Num n={r.v15}/></td>
+                  <td className="r"><Num n={r.v30} style={{fontWeight:700}}/></td>
+                  <td className="r num">{r.reels ?? "—"}</td>
+                  <td className="r"><Num n={r.comments}/></td>
+                  <td className="r num">{r.eng!=null ? r.eng.toFixed(1).replace(".",",")+" %" : "—"}</td>
+                  <td className="r"><Num n={r.clicks ?? r.visits} style={{color:"var(--violet)",fontWeight:700}}/></td>
+                  <td className="r"><Num n={r.followers}/></td>
+                  <td className="r"><Delta n={r.dFol}/></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table></div>
+      </div>
+      <div style={{color:"var(--mut-2)",fontSize:13,padding:"0 4px"}}>
+        Chiffres cumulés par personne. Le détail des comptes reste privé à chacun.
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    VUE VA
    ============================================================ */
-function Va({ models, accounts, snaps, refs, vaName, reload, say, out, toast }){
+function Va({ models, accounts, snaps, refs, vas, links, linkStats, vaName, reload, say, out, toast }){
   const [tab,setTab]=useState("mes");
   const mine = accounts.filter(a=>a.active && a.status!=="supprime" && a.va_name===vaName);
   const rows = useMemo(()=>mine.map(a=>({a,st:stats(a,snaps)})),[accounts,snaps,vaName]);
@@ -1152,6 +1375,7 @@ function Va({ models, accounts, snaps, refs, vaName, reload, say, out, toast }){
         <div className="logo"><span className="dot"/>{vaName}</div>
         <div className="nav">
           <button data-on={tab==="mes"?"1":"0"} onClick={()=>setTab("mes")}>Mes comptes</button>
+          <button data-on={tab==="classement"?"1":"0"} onClick={()=>setTab("classement")}>Classement</button>
           <button data-on={tab==="refs"?"1":"0"} onClick={()=>setTab("refs")}>Comptes à suivre</button>
         </div>
         <button className="btn q s" onClick={out}>Quitter</button>
@@ -1159,6 +1383,7 @@ function Va({ models, accounts, snaps, refs, vaName, reload, say, out, toast }){
 
       <div className="wrap">
         {tab==="refs" && <Refs refs={refs} admin={false} reload={reload} say={say}/>}
+        {tab==="classement" && <Classement accounts={accounts} snaps={snaps} vas={vas} links={links} linkStats={linkStats} me={vaName}/>}
 
         {tab==="mes" && <>
           <Hero views30={tot.views30} views7={tot.views7} views15={tot.views15}
