@@ -3,483 +3,1111 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Sensual Aura — Tracker Insta</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<title>Sensual Aura — Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
   :root{
-    --bg:#0C0C0F; --panel:#141419; --panel2:#1A1A21; --border:#26262F;
-    --text:#E9E7E2; --muted:#8E8D98; --gold:#E3A94E; --gold-soft:rgba(227,169,78,.12);
-    --green:#46C97E; --red:#E5636B; --orange:#E89A5B; --gray:#6B6B76;
+    --n0:#0B0710; --n1:#140E1C; --n2:#1C1428; --n3:#261B35;
+    --line:#2E2240; --line-soft:#241A33;
+    --txt:#F0EAF7; --mut:#9B8FB0; --mut-2:#6F6383;
+    --violet:#A855F7; --violet-deep:#833AB4;
+    --magenta:#E1306C; --amber:#F9A03F;
+    --mint:#3DDC97; --coral:#FF6B6B;
+    --grad: linear-gradient(103deg,#833AB4 0%,#C13584 38%,#E1306C 62%,#F9A03F 100%);
+    --ring: 0 0 0 3px rgba(168,85,247,.32);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:var(--bg);color:var(--text);font-family:'Instrument Sans',system-ui,sans-serif;font-size:15px}
-  body{min-height:100vh}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:
+      radial-gradient(1100px 620px at 8% -8%, rgba(131,58,180,.16), transparent 60%),
+      radial-gradient(900px 520px at 96% 4%, rgba(225,48,108,.10), transparent 62%),
+      var(--n0);
+    background-attachment:fixed;
+    color:var(--txt);
+    font-family:Inter,system-ui,-apple-system,sans-serif;
+    font-size:15px; line-height:1.5;
+    min-height:100vh;
+  }
   input,select,textarea,button{font-family:inherit;font-size:inherit;color:inherit}
-  input,select,textarea{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;outline:none;width:100%}
-  input:focus,select:focus,textarea:focus{border-color:var(--gold)}
-  button{cursor:pointer;border:none;background:none}
-  .num{font-variant-numeric:tabular-nums}
-  a{color:var(--gold);text-decoration:none}
+  input,select,textarea{
+    background:var(--n2); border:1px solid var(--line); border-radius:11px;
+    padding:10px 13px; outline:none; width:100%; transition:border-color .16s, box-shadow .16s;
+  }
+  input:focus,select:focus,textarea:focus{border-color:var(--violet); box-shadow:var(--ring)}
+  button{cursor:pointer;border:none;background:none;transition:transform .09s cubic-bezier(.34,1.56,.64,1), filter .16s, background .16s}
+  button:active{transform:scale(.955)}
+  button:focus-visible{outline:none; box-shadow:var(--ring)}
+  a{color:var(--magenta);text-decoration:none}
+  a:hover{text-decoration:underline}
 
-  .topbar{display:flex;align-items:center;gap:20px;padding:14px 22px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,15,.92);backdrop-filter:blur(8px);z-index:20}
-  .brand{font-weight:700;letter-spacing:.3px}
-  .brand em{color:var(--gold);font-style:normal}
-  .tabs{display:flex;gap:4px;flex:1}
-  .tab{padding:8px 14px;border-radius:8px;color:var(--muted);font-weight:500}
-  .tab:hover{color:var(--text)}
-  .tab.on{background:var(--gold-soft);color:var(--gold)}
-  .wrap{max-width:1240px;margin:0 auto;padding:22px}
+  /* chiffres : jamais coupés, toujours alignés */
+  .num{font-variant-numeric:tabular-nums; white-space:nowrap}
+  .val{font-family:'Bricolage Grotesque',Inter,sans-serif; font-variant-numeric:tabular-nums; white-space:nowrap; letter-spacing:-.02em}
+  .unit{font-size:.62em; font-weight:600; margin-left:.12em; color:var(--mut)}
 
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px}
-  .panel-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)}
-  .panel-head .bar{width:4px;height:16px;background:var(--gold);border-radius:2px}
-  .panel-head h2{font-size:14px;font-weight:600;letter-spacing:.6px;flex:1}
-  .panel-head .hint{color:var(--muted);font-size:12.5px}
+  .grad-txt{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 
-  table{width:100%;border-collapse:collapse}
-  th{text-align:left;font-size:11.5px;font-weight:600;letter-spacing:.8px;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border)}
+  /* barre du haut */
+  .bar{
+    position:sticky; top:0; z-index:40;
+    display:flex; align-items:center; gap:18px;
+    padding:12px 20px;
+    background:rgba(11,7,16,.82); backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line-soft);
+  }
+  .logo{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+  .logo .dot{width:11px;height:11px;border-radius:4px;background:var(--grad)}
+  .nav{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none}
+  .nav::-webkit-scrollbar{display:none}
+  .nav button{
+    padding:8px 14px;border-radius:10px;color:var(--mut);font-weight:500;white-space:nowrap;
+  }
+  .nav button:hover{color:var(--txt);background:var(--n2)}
+  .nav button[data-on="1"]{color:var(--txt);background:var(--n3)}
+  .nav button[data-on="1"]::after{
+    content:"";display:block;height:2px;border-radius:2px;background:var(--grad);
+    margin-top:5px;margin-bottom:-7px;
+  }
+
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 18px 70px}
+
+  /* héros */
+  .hero{
+    border:1px solid var(--line); border-radius:22px; overflow:hidden;
+    background:linear-gradient(168deg,var(--n2),var(--n1) 62%);
+    margin-bottom:16px;
+  }
+  .hero-in{padding:26px 26px 22px;display:flex;gap:30px;flex-wrap:wrap;align-items:flex-end}
+  .hero-main{flex:1;min-width:250px}
+  .hero-label{color:var(--mut);font-size:13px;font-weight:500;margin-bottom:2px}
+  .hero-num{font-size:clamp(46px,9vw,78px);font-weight:800;line-height:1}
+  .hero-sub{margin-top:9px;display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:13.5px}
+
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 11px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap;
+  }
+  .pill.up{background:rgba(61,220,151,.13);color:var(--mint)}
+  .pill.down{background:rgba(255,107,107,.13);color:var(--coral)}
+  .pill.flat{background:var(--n3);color:var(--mut)}
+
+  /* palier */
+  .tier{min-width:250px;flex:1}
+  .tier-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+  .tier-name{font-weight:700;font-size:14.5px}
+  .tier-goal{color:var(--mut);font-size:12.5px;white-space:nowrap}
+  .track{height:9px;border-radius:999px;background:var(--n3);overflow:hidden}
+  .fill{height:100%;border-radius:999px;background:var(--grad);transition:width .9s cubic-bezier(.22,1,.36,1)}
+  .tier-msg{margin-top:9px;font-size:13px;color:var(--mut)}
+  .tier-msg strong{color:var(--txt)}
+
+  /* trio de périodes */
+  .trio{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 26px 24px}
+  .cell{background:var(--n2);border:1px solid var(--line-soft);border-radius:15px;padding:15px 16px}
+  .cell-l{color:var(--mut);font-size:12px;font-weight:500;margin-bottom:5px}
+  .cell-v{font-size:25px;font-weight:700}
+  .cell-d{margin-top:7px;font-size:12.5px}
+
+  /* panneaux */
+  .panel{background:var(--n1);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-bottom:16px}
+  .ph{display:flex;align-items:center;gap:11px;padding:15px 20px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+  .ph h2{font-size:15px;font-weight:700;letter-spacing:-.01em;flex:1;white-space:nowrap}
+  .ph .hint{color:var(--mut-2);font-size:12.5px}
+
+  .scroll{overflow-x:auto;scrollbar-width:thin}
+  table{width:100%;border-collapse:collapse;min-width:640px}
+  th{
+    text-align:left;font-size:11.5px;font-weight:600;color:var(--mut-2);
+    padding:11px 14px;border-bottom:1px solid var(--line-soft);white-space:nowrap;
+  }
   th.r,td.r{text-align:right}
-  td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
-  tr:last-child td{border-bottom:none}
-  tr.click{cursor:pointer}
-  tr.click:hover td{background:var(--panel2)}
+  td{padding:13px 14px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  tr.tap{cursor:pointer;transition:background .13s}
+  tr.tap:hover td{background:var(--n2)}
+  .who{font-weight:600}
+  .sub{color:var(--mut-2);font-size:12px;font-weight:400;margin-top:2px}
 
-  .badge{display:inline-block;padding:3px 9px;border-radius:6px;font-size:12px;font-weight:600}
-  .b-actif{background:rgba(70,201,126,.14);color:var(--green)}
-  .b-banni{background:rgba(229,99,107,.16);color:var(--red)}
-  .b-introuvable{background:rgba(232,154,91,.15);color:var(--orange)}
-  .b-supprime{background:rgba(107,107,118,.18);color:var(--gray)}
-  .pos{color:var(--green)} .neg{color:var(--red)} .mut{color:var(--muted)}
+  .chip{display:inline-block;padding:3px 10px;border-radius:8px;font-size:12px;font-weight:600;white-space:nowrap}
+  .c-actif{background:rgba(61,220,151,.13);color:var(--mint)}
+  .c-banni{background:rgba(255,107,107,.14);color:var(--coral)}
+  .c-introuvable{background:rgba(249,160,63,.15);color:var(--amber)}
+  .c-supprime{background:var(--n3);color:var(--mut-2)}
 
-  .btn{background:var(--gold);color:#141419;font-weight:600;padding:9px 16px;border-radius:8px}
-  .btn:hover{filter:brightness(1.08)}
-  .btn.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
-  .btn.danger{background:rgba(229,99,107,.16);color:var(--red)}
-  .btn.sm{padding:6px 11px;font-size:13px;border-radius:7px}
+  .btn{
+    background:var(--grad);color:#fff;font-weight:600;padding:10px 17px;border-radius:11px;
+    box-shadow:0 5px 18px rgba(193,53,132,.28); white-space:nowrap;
+  }
+  .btn:hover{filter:brightness(1.09)}
+  .btn:active{box-shadow:0 2px 8px rgba(193,53,132,.26)}
+  .btn.q{background:var(--n2);color:var(--txt);border:1px solid var(--line);box-shadow:none}
+  .btn.q:hover{background:var(--n3)}
+  .btn.d{background:rgba(255,107,107,.14);color:var(--coral);box-shadow:none}
+  .btn.s{padding:6px 12px;font-size:13px;border-radius:9px}
 
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px}
+  .seg{display:inline-flex;background:var(--n2);border:1px solid var(--line);border-radius:12px;padding:3px;gap:2px}
+  .seg button{padding:6px 13px;border-radius:9px;font-size:13px;font-weight:600;color:var(--mut)}
+  .seg button:hover{color:var(--txt)}
+  .seg button[data-on="1"]{background:var(--n3);color:var(--txt);box-shadow:inset 0 0 0 1px var(--line)}
+
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .fld label{display:block;font-size:12.5px;color:var(--mut);margin-bottom:5px}
+  .pad{padding:20px}
 
-  .stars button{color:#3A3A44;font-size:16px;padding:0 1px}
-  .stars button.on{color:var(--gold)}
+  .stars button{color:#3A2E4A;font-size:17px;padding:0 1px;line-height:1}
+  .stars button[data-on="1"]{color:var(--amber)}
 
-  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow-y:auto}
-  .modal{background:var(--panel);border:1px solid var(--border);border-radius:16px;width:100%;max-width:640px;padding:22px}
+  .ov{position:fixed;inset:0;background:rgba(5,3,8,.7);backdrop-filter:blur(3px);display:flex;align-items:flex-start;justify-content:center;padding:36px 14px;z-index:60;overflow-y:auto}
+  .modal{background:var(--n1);border:1px solid var(--line);border-radius:20px;width:100%;max-width:680px;padding:22px}
 
-  .login{min-height:100vh;display:flex;align-items:center;justify-content:center}
-  .login-box{width:320px;text-align:center}
-  .login-box h1{font-size:22px;margin-bottom:6px}
-  .login-box p{color:var(--muted);margin-bottom:22px}
-  .login-box input{text-align:center;font-size:22px;letter-spacing:8px}
+  .gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .gate-box{width:100%;max-width:330px;text-align:center}
+  .gate-box h1{font-family:'Bricolage Grotesque',sans-serif;font-size:27px;font-weight:800;letter-spacing:-.02em;margin-bottom:5px}
+  .gate-box p{color:var(--mut);margin-bottom:22px;font-size:14px}
+  .gate-box input{text-align:center;font-size:23px;letter-spacing:9px;padding:13px}
 
-  .alert-line{display:flex;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border)}
-  .alert-line:last-child{border-bottom:none}
-  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .alert{display:flex;gap:13px;align-items:flex-start;padding:14px 20px;border-bottom:1px solid var(--line-soft)}
+  .alert:last-child{border-bottom:none}
+  .bead{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:7px}
 
-  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--border);padding:11px 18px;border-radius:10px;z-index:100}
-  @media(max-width:760px){
-    .grid2{grid-template-columns:1fr}
-    .wrap{padding:14px}
-    .hide-m{display:none}
-    th,td{padding:9px 8px}
+  .toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+    background:var(--n3);border:1px solid var(--line);padding:12px 20px;border-radius:13px;
+    z-index:90;box-shadow:0 10px 34px rgba(0,0,0,.45);font-size:14px;max-width:90vw;
+  }
+  .empty{padding:34px 20px;text-align:center;color:var(--mut-2);font-size:14px}
+
+  @media (max-width:720px){
+    .wrap{padding:16px 12px 60px}
+    .hero-in{padding:20px 18px 16px;gap:20px}
+    .trio{grid-template-columns:1fr;padding:0 18px 18px}
+    .g2{grid-template-columns:1fr}
+    .modal{padding:18px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important}
   }
 </style>
 </head>
 <body>
 <div id="root"></div>
-
 <script type="text/babel" data-presets="react">
-/* ============================================================
-   CONFIGURATION — chargée depuis /.netlify/functions/config
-   (les clés vivent uniquement dans les variables Netlify)
-   ============================================================ */
 const { useState, useEffect, useMemo, useRef } = React;
-let db = null; // client Supabase, créé après chargement de la config
+let db = null;
 
-/* ---------- Helpers ---------- */
+/* ---------- dates & format ---------- */
 const todayStr = () => new Date().toISOString().slice(0,10);
 const daysAgoStr = (n) => new Date(Date.now() - n*86400000).toISOString().slice(0,10);
-const fmt = (n) => {
-  if (n === null || n === undefined) return "—";
-  if (Math.abs(n) >= 1e6) return (n/1e6).toFixed(1).replace(".",",") + " M";
-  if (Math.abs(n) >= 1e4) return (n/1e3).toFixed(1).replace(".",",") + " k";
-  return String(n);
-};
-const fmtDelta = (n) => {
-  if (n === null || n === undefined) return <span className="mut">—</span>;
-  if (n > 0) return <span className="pos num">+{fmt(n)}</span>;
-  if (n < 0) return <span className="neg num">{fmt(n)}</span>;
-  return <span className="mut num">±0</span>;
-};
-const fmtDate = (d) => {
-  if (!d) return "—";
-  const [y,m,dd] = d.split("-");
-  return `${dd}/${m}`;
-};
 const ageDays = (d) => Math.floor((Date.now() - new Date(d+"T00:00:00").getTime())/86400000);
 const cleanUsername = (u) => u.trim().replace(/^@/,"").replace(/\s+/g,"").toLowerCase();
+const fmtDate = (d) => { if(!d) return "—"; const [y,m,dd]=d.split("-"); return `${dd}/${m}`; };
+
+// Découpe un nombre en valeur + unité pour que le "k" ne parte jamais à la ligne
+function split(n){
+  if (n === null || n === undefined) return null;
+  const a = Math.abs(n);
+  const dec = (x,d) => x.toFixed(d).replace(".",",");
+  if (a >= 1e6){
+    const m = n/1e6;
+    return { v:dec(m, Math.abs(m)>=10 ? 0 : 1), u:"M" };
+  }
+  if (a >= 1e4){
+    const k = n/1e3;
+    // 999 999 arrondirait à "1000 k" : on bascule en millions
+    if (Math.abs(Number(k.toFixed(1))) >= 1000) return { v:dec(n/1e6,1), u:"M" };
+    return { v:dec(k,1), u:"k" };
+  }
+  if (a >= 1000) return { v:n.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g," "), u:"" };
+  return { v:String(n), u:"" };
+}
+function Num({ n, className="", style }){
+  const s = split(n);
+  if (!s) return <span className={"num "+className} style={{color:"var(--mut-2)",...style}}>—</span>;
+  return <span className={"val "+className} style={style}>{s.v}{s.u && <span className="unit">{s.u}</span>}</span>;
+}
+const fmtTxt = (n) => { const s = split(n); return s ? s.v + (s.u ? " " + s.u : "") : "—"; };
+
+function Delta({ n, suffix }){
+  if (n === null || n === undefined) return <span className="pill flat">—</span>;
+  if (n > 0) return <span className="pill up">▲ {fmtTxt(n)}{suffix||""}</span>;
+  if (n < 0) return <span className="pill down">▼ {fmtTxt(Math.abs(n))}{suffix||""}</span>;
+  return <span className="pill flat">stable</span>;
+}
 
 const PERIODS = [
-  { key:"7d",    label:"7 jours"  },
-  { key:"15d",   label:"15 jours" },
-  { key:"30d",   label:"30 jours" },
-  { key:"total", label:"Total"    },
+  { key:"7d", label:"7 jours", days:7 },
+  { key:"15d", label:"15 jours", days:15 },
+  { key:"30d", label:"30 jours", days:30 },
+  { key:"total", label:"Total", days:null },
 ];
-// Lit une métrique sur la période choisie, avec repli sur le 30 j (anciens relevés)
-const metric = (snap, name, period) => {
-  if (!snap) return null;
-  const v = snap[`${name}_${period}`];
-  if (v !== null && v !== undefined) return v;
-  if (period === "30d") return null;
-  return null;
-};
+const STATUS = { actif:"Actif", introuvable:"Introuvable", banni:"Banni", supprime:"Supprimé" };
 
-function PeriodPicker({ value, onChange }) {
+/* ---------- paliers de vues (30 jours) ---------- */
+const TIERS = [
+  { at:0,        name:"Premiers pas",   msg:"Les premiers reels sont en ligne. On regarde ce qui accroche." },
+  { at:10000,    name:"Ça décolle",     msg:"10 k dépassés. Le format commence à trouver son public." },
+  { at:50000,    name:"Ça tourne",      msg:"50 k sur 30 jours. Les comptes tiennent la route." },
+  { at:100000,   name:"Six chiffres",   msg:"100 k franchis. Beau travail — c'est le seuil où le trafic devient sérieux." },
+  { at:500000,   name:"Demi-million",   msg:"500 k sur 30 jours. La machine est lancée." },
+  { at:1000000,  name:"Le million",     msg:"1 million de vues sur 30 jours. Rare. Profite." },
+  { at:5000000,  name:"Cinq millions",  msg:"5 M sur 30 jours. À ce stade, c'est une audience, plus un test." },
+  { at:20000000, name:"Hors norme",     msg:"20 M. Il n'y a plus de palier au-dessus." },
+];
+function tierOf(v){
+  const n = v || 0;
+  let cur = TIERS[0], next = TIERS[1];
+  for (let i=0;i<TIERS.length;i++){
+    if (n >= TIERS[i].at){ cur = TIERS[i]; next = TIERS[i+1] || null; }
+  }
+  const from = cur.at, to = next ? next.at : cur.at;
+  const pct = next ? Math.max(0, Math.min(100, ((n-from)/(to-from))*100)) : 100;
+  return { cur, next, pct };
+}
+
+/* ---------- calculs par compte ---------- */
+function stats(account, snaps){
+  const s = snaps.filter(x=>x.account_id===account.id).sort((a,b)=>a.taken_on<b.taken_on?-1:1);
+  const latest = s[s.length-1] || null;
+  const tracked = s.length>1
+    ? Math.round((new Date(s[s.length-1].taken_on) - new Date(s[0].taken_on))/86400000) : 0;
+  const at = (n) => {
+    if (tracked < n) return null;
+    const t = daysAgoStr(n); let best=null;
+    for (const x of s) if (x.taken_on <= t) best = x;
+    return best;
+  };
+  const dFol = (n) => {
+    const r = at(n);
+    if (!latest || !r || r===latest || latest.followers==null || r.followers==null) return null;
+    return latest.followers - r.followers;
+  };
+  const per = (p) => {
+    if (!latest) return { views:null, reels:null, likes:null, comments:null, avg:null, eng:null };
+    const views=latest[`views_${p}`] ?? null, reels=latest[`reels_${p}`] ?? null;
+    const likes=latest[`likes_${p}`] ?? null, comments=latest[`comments_${p}`] ?? null;
+    return {
+      views, reels, likes, comments,
+      avg: (views!=null && reels>0) ? Math.round(views/reels) : null,
+      eng: (latest.followers>0 && reels>0 && (likes||comments))
+        ? (((likes+comments)/reels)/latest.followers)*100 : null,
+    };
+  };
+  const dViews = (p) => {
+    const nd = p==="7d"?7 : p==="15d"?15 : p==="30d"?30 : null;
+    if (nd===null || !latest || tracked < nd) return null;
+    const r = at(nd);
+    if (!r || r===latest) return null;
+    const a=latest[`views_${p}`], b=r[`views_${p}`];
+    return (a==null||b==null) ? null : a-b;
+  };
+  return { latest, tracked, d7:dFol(7), d30:dFol(30), per, dViews, series:s };
+}
+const sumOf = (rows, f) => { let t=0,h=false; for(const r of rows){ const v=f(r); if(v!=null){t+=v;h=true;} } return h?t:null; };
+
+/* ---------- petits composants ---------- */
+function Seg({ value, onChange, options }){
   return (
-    <div className="row" style={{gap:4}}>
-      {PERIODS.map(p =>
-        <button key={p.key} className={"tab"+(value===p.key?" on":"")}
-          style={{border:"1px solid var(--border)",fontSize:13,padding:"5px 12px"}}
-          onClick={()=>onChange(p.key)}>{p.label}</button>)}
+    <div className="seg">
+      {options.map(o=>
+        <button key={o.key} data-on={value===o.key?"1":"0"} onClick={()=>onChange(o.key)}>{o.label}</button>)}
     </div>
   );
 }
-
-const STATUS_LABEL = { actif:"Actif", introuvable:"Introuvable", banni:"Banni", supprime:"Supprimé" };
-
-/* ---------- Calculs par compte ---------- */
-function computeAccountStats(account, snaps) {
-  const s = snaps.filter(x => x.account_id === account.id).sort((a,b)=>a.taken_on<b.taken_on?-1:1);
-  const latest = s[s.length-1] || null;
-  // Combien de jours d'historique a-t-on réellement pour ce compte ?
-  const daysTracked = (s.length > 1)
-    ? Math.round((new Date(s[s.length-1].taken_on) - new Date(s[0].taken_on)) / 86400000)
-    : 0;
-  // Référence à J-n : uniquement si on a vraiment un relevé assez ancien.
-  // Sinon null — pas de repli sur le plus ancien, ça donnerait un Δ mensonger.
-  const at = (nDays) => {
-    if (daysTracked < nDays) return null;
-    const target = daysAgoStr(nDays);
-    let best = null;
-    for (const x of s) { if (x.taken_on <= target) best = x; }
-    return best;
-  };
-  const s7 = at(7), s30 = at(30);
-  const d7  = (latest && s7 && s7 !== latest && latest.followers!=null && s7.followers!=null) ? latest.followers - s7.followers : null;
-  const d30 = (latest && s30 && s30 !== latest && latest.followers!=null && s30.followers!=null) ? latest.followers - s30.followers : null;
-  const avgViews = (latest && latest.views_30d!=null && latest.reels_30d > 0) ? Math.round(latest.views_30d / latest.reels_30d) : null;
-  const engagement = (latest && latest.followers > 0 && (latest.likes_30d || latest.comments_30d))
-    ? ((latest.likes_30d + latest.comments_30d) / latest.followers) * 100 : null;
-  // métriques par période, lues depuis le dernier relevé
-  const per = (p) => {
-    if (!latest) return { views:null, reels:null, likes:null, comments:null, avg:null, eng:null };
-    const views = latest[`views_${p}`] ?? null;
-    const reels = latest[`reels_${p}`] ?? null;
-    const likes = latest[`likes_${p}`] ?? null;
-    const comments = latest[`comments_${p}`] ?? null;
-    const avg = (views!=null && reels>0) ? Math.round(views/reels) : null;
-    // Taux d'engagement standard : interactions MOYENNES par reel / followers
-    const eng = (latest.followers>0 && reels>0 && (likes||comments))
-      ? (((likes+comments)/reels)/latest.followers)*100 : null;
-    return { views, reels, likes, comments, avg, eng };
-  };
-  // Δ VUES : compare la fenêtre actuelle à la même fenêtre décalée dans le passé.
-  // Ex. période 7 j → vues des 7 derniers jours vs vues des 7 jours d'avant.
-  const deltaViews = (p) => {
-    const nDays = p === "7d" ? 7 : p === "15d" ? 15 : p === "30d" ? 30 : null;
-    if (nDays === null || !latest || daysTracked < nDays) return null;
-    const ref = at(nDays);
-    if (!ref || ref === latest) return null;
-    const a = latest[`views_${p}`], b = ref[`views_${p}`];
-    if (a == null || b == null) return null;
-    return a - b;
-  };
-  return { latest, d7, d30, daysTracked, avgViews, engagement, per, deltaViews, series: s };
+function Status({ a }){
+  return (
+    <span>
+      <span className={"chip c-"+a.status}>{STATUS[a.status]||a.status}</span>
+      {a.status!=="actif" && a.status_changed_on &&
+        <span style={{color:"var(--mut-2)",fontSize:11.5,marginLeft:6}}>{fmtDate(a.status_changed_on)}</span>}
+    </span>
+  );
 }
-
-/* ---------- Sparkline SVG ---------- */
-function Sparkline({ series }) {
-  const pts = series.filter(s=>s.followers!=null).map(s=>s.followers);
-  if (pts.length < 2) return <div className="mut" style={{fontSize:13}}>Pas encore assez de relevés pour une courbe.</div>;
-  const w=560,h=120,pad=6;
-  const min=Math.min(...pts), max=Math.max(...pts), span=(max-min)||1;
-  const step=(w-pad*2)/(pts.length-1);
-  const d=pts.map((v,i)=>`${i?"L":"M"}${(pad+i*step).toFixed(1)},${(h-pad-((v-min)/span)*(h-pad*2)).toFixed(1)}`).join(" ");
+function Stars({ value, onChange }){
+  return <span className="stars">{[1,2,3,4,5].map(i=>
+    <button key={i} data-on={i<=value?"1":"0"}
+      onClick={(e)=>{e.stopPropagation(); onChange && onChange(i===value?0:i);}}>★</button>)}</span>;
+}
+function Spark({ series }){
+  const pts = series.filter(x=>x.followers!=null).map(x=>x.followers);
+  if (pts.length<2) return <div className="empty" style={{padding:"18px 0"}}>La courbe apparaîtra au deuxième relevé.</div>;
+  const w=600,h=120,pad=8;
+  const mn=Math.min(...pts), mx=Math.max(...pts), sp=(mx-mn)||1;
+  const st=(w-pad*2)/(pts.length-1);
+  const d=pts.map((v,i)=>`${i?"L":"M"}${(pad+i*st).toFixed(1)},${(h-pad-((v-mn)/sp)*(h-pad*2)).toFixed(1)}`).join(" ");
+  const area = d + ` L${(pad+(pts.length-1)*st).toFixed(1)},${h-pad} L${pad},${h-pad} Z`;
   return (
     <svg viewBox={`0 0 ${w} ${h}`} style={{width:"100%",height:120,display:"block"}}>
-      <path d={d} fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <text x={pad} y={12} fill="var(--muted)" fontSize="11" className="num">{fmt(max)}</text>
-      <text x={pad} y={h-2} fill="var(--muted)" fontSize="11" className="num">{fmt(min)}</text>
+      <defs>
+        <linearGradient id="gl" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#833AB4"/><stop offset="60%" stopColor="#E1306C"/><stop offset="100%" stopColor="#F9A03F"/>
+        </linearGradient>
+        <linearGradient id="ga" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(225,48,108,.26)"/><stop offset="100%" stopColor="rgba(225,48,108,0)"/>
+        </linearGradient>
+      </defs>
+      <path d={area} fill="url(#ga)"/>
+      <path d={d} fill="none" stroke="url(#gl)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
 
-function Stars({ value, onChange }) {
-  return (
-    <span className="stars">
-      {[1,2,3,4,5].map(i =>
-        <button key={i} className={i<=value?"on":""} onClick={(e)=>{e.stopPropagation(); onChange && onChange(i===value?0:i);}}>★</button>
-      )}
-    </span>
-  );
-}
-
-function StatusBadge({ account }) {
-  return (
-    <span>
-      <span className={"badge b-"+account.status}>{STATUS_LABEL[account.status]||account.status}</span>
-      {account.status!=="actif" && account.status_changed_on &&
-        <span className="mut" style={{fontSize:11.5,marginLeft:6}}>{fmtDate(account.status_changed_on)}</span>}
-    </span>
-  );
-}
-
 /* ============================================================
-   APP
+   RACINE
    ============================================================ */
-function App() {
-  const [role, setRole] = useState(sessionStorage.getItem("sa_role") || null);
-  const [vaName, setVaName] = useState(sessionStorage.getItem("sa_va") || null);
-  const [settings, setSettings] = useState(null);
-  const [models, setModels] = useState([]);
-  const [accounts, setAccounts] = useState([]);
-  const [snaps, setSnaps] = useState([]);
-  const [vas, setVas] = useState([]);
-  const [refs, setRefs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
+function App(){
+  const [role,setRole] = useState(sessionStorage.getItem("sa_role")||null);
+  const [vaName,setVaName] = useState(sessionStorage.getItem("sa_va")||null);
+  const [settings,setSettings] = useState(null);
+  const [models,setModels] = useState([]);
+  const [accounts,setAccounts] = useState([]);
+  const [snaps,setSnaps] = useState([]);
+  const [vas,setVas] = useState([]);
+  const [refs,setRefs] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [toast,setToast] = useState(null);
+  const say = (m)=>{ setToast(m); setTimeout(()=>setToast(null),3400); };
 
-  const notify = (m) => { setToast(m); setTimeout(()=>setToast(null), 3500); };
-
-  async function loadAll() {
+  async function load(){
     setLoading(true);
-    if (!db) {
-      try {
+    if (!db){
+      try{
         const cfg = await (await fetch("/.netlify/functions/config")).json();
-        if (!cfg.url || !cfg.anonKey) {
-          notify("Configuration manquante — ajoute SUPABASE_URL et SUPABASE_ANON_KEY dans les variables Netlify puis redéploie");
-          setLoading(false);
-          return;
-        }
-        db = window.supabase.createClient(cfg.url, cfg.anonKey);
-      } catch (e) {
-        notify("Impossible de charger la configuration — le site est bien déployé sur Netlify ?");
-        setLoading(false);
-        return;
-      }
+        if(!cfg.url||!cfg.anonKey){ say("Configuration Supabase manquante dans Netlify"); setLoading(false); return; }
+        db = window.supabase.createClient(cfg.url,cfg.anonKey);
+      }catch{ say("Impossible de charger la configuration"); setLoading(false); return; }
     }
-    const [se, mo, ac, sn, va, rf] = await Promise.all([
+    const cols = "account_id,taken_on,followers,following,posts_count,"
+      + "views_7d,reels_7d,likes_7d,comments_7d,views_15d,reels_15d,likes_15d,comments_15d,"
+      + "views_30d,reels_30d,likes_30d,comments_30d,views_total,reels_total,likes_total,comments_total";
+    const [se,mo,ac,sn,va,rf] = await Promise.all([
       db.from("app_settings").select("data").eq("id",1).single(),
       db.from("models").select("*").order("name"),
       db.from("accounts").select("*").order("username"),
-      db.from("snapshots").select("account_id,taken_on,followers,following,posts_count,views_7d,reels_7d,likes_7d,comments_7d,views_15d,reels_15d,likes_15d,comments_15d,views_30d,reels_30d,likes_30d,comments_30d,views_total,reels_total,likes_total,comments_total").gte("taken_on", daysAgoStr(45)).order("taken_on"),
+      db.from("snapshots").select(cols).gte("taken_on",daysAgoStr(60)).order("taken_on"),
       db.from("vas").select("*").order("name"),
       db.from("ref_accounts").select("*").order("username"),
     ]);
-    if (se.error||mo.error||ac.error||sn.error) {
-      notify("Erreur de chargement — vérifie la config Supabase");
-      console.error(se.error||mo.error||ac.error||sn.error);
-    }
-    if (va.error || rf.error) {
-      notify("Tables VA / références manquantes — lance le script supabase-v2.sql dans Supabase");
-      console.error(va.error || rf.error);
-    }
-    setSettings(se.data?.data || {});
-    setModels(mo.data || []);
-    setAccounts(ac.data || []);
-    setSnaps(sn.data || []);
-    setVas(va.data || []);
-    setRefs(rf.data || []);
+    if (se.error||mo.error||ac.error||sn.error) say("Erreur de chargement des données");
+    if (va.error||rf.error) say("Tables VA / références absentes — lance supabase-v2.sql");
+    setSettings(se.data?.data||{}); setModels(mo.data||[]); setAccounts(ac.data||[]);
+    setSnaps(sn.data||[]); setVas(va.data||[]); setRefs(rf.data||[]);
     setLoading(false);
   }
-  useEffect(()=>{ loadAll(); }, []);
+  useEffect(()=>{ load(); },[]);
 
-  function login(pin) {
-    if (!settings) return;
-    if (pin === String(settings.admin_pin)) { setRole("admin"); sessionStorage.setItem("sa_role","admin"); }
-    else if (pin === String(settings.va_pin)) { setRole("va"); sessionStorage.setItem("sa_role","va"); }
-    else notify("PIN incorrect");
+  function enter(pin){
+    if(!settings) return;
+    if(pin===String(settings.admin_pin)){ setRole("admin"); sessionStorage.setItem("sa_role","admin"); }
+    else if(pin===String(settings.va_pin)){ setRole("va"); sessionStorage.setItem("sa_role","va"); }
+    else say("PIN incorrect");
   }
-  function pickVa(name) { setVaName(name); sessionStorage.setItem("sa_va", name); }
-  function logout(){
-    setRole(null); setVaName(null);
-    sessionStorage.removeItem("sa_role"); sessionStorage.removeItem("sa_va");
-  }
+  function pick(n){ setVaName(n); sessionStorage.setItem("sa_va",n); }
+  function out(){ setRole(null); setVaName(null); sessionStorage.removeItem("sa_role"); sessionStorage.removeItem("sa_va"); }
 
-  if (loading) return <div className="login"><div className="mut">Chargement…</div></div>;
-  if (!role) return <Login onSubmit={login} />;
-  if (role === "va" && !vaName) return <PickVa vas={vas.filter(v=>v.active)} onPick={pickVa} logout={logout} />;
-  return role === "admin"
-    ? <AdminApp settings={settings} models={models} accounts={accounts} snaps={snaps} vas={vas} refs={refs} reload={loadAll} notify={notify} logout={logout} toast={toast} />
-    : <VaApp models={models} accounts={accounts} snaps={snaps} refs={refs} vaName={vaName} reload={loadAll} notify={notify} logout={logout} toast={toast} />;
+  if (loading) return <div className="gate"><div style={{color:"var(--mut)"}}>Chargement…</div></div>;
+  if (!role) return <Gate onEnter={enter}/>;
+  if (role==="va" && !vaName) return <PickVa vas={vas.filter(v=>v.active)} onPick={pick} back={out}/>;
+  const shared = { models, accounts, snaps, vas, refs, reload:load, say, out, toast };
+  return role==="admin"
+    ? <Admin settings={settings} {...shared}/>
+    : <Va vaName={vaName} {...shared}/>;
 }
 
-function Login({ onSubmit }) {
-  const [pin, setPin] = useState("");
+function Gate({ onEnter }){
+  const [pin,setPin] = useState("");
   return (
-    <div className="login">
-      <div className="login-box">
-        <h1>Sensual <em style={{color:"var(--gold)",fontStyle:"normal"}}>Aura</em></h1>
-        <p>Tracker Instagram — entre ton PIN</p>
-        <input type="password" inputMode="numeric" autoFocus value={pin}
-          onChange={e=>setPin(e.target.value)}
-          onKeyDown={e=>{ if(e.key==="Enter") onSubmit(pin); }} />
-        <button className="btn" style={{marginTop:14,width:"100%"}} onClick={()=>onSubmit(pin)}>Entrer</button>
-      </div>
-    </div>
+    <div className="gate"><div className="gate-box">
+      <h1>Sensual <span className="grad-txt">Aura</span></h1>
+      <p>Entre ton code pour ouvrir le tracker</p>
+      <input type="password" inputMode="numeric" autoFocus value={pin}
+        onChange={e=>setPin(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")onEnter(pin);}}/>
+      <button className="btn" style={{marginTop:14,width:"100%",padding:12}} onClick={()=>onEnter(pin)}>Ouvrir</button>
+    </div></div>
+  );
+}
+function PickVa({ vas, onPick, back }){
+  return (
+    <div className="gate"><div className="gate-box">
+      <h1>Qui travaille ?</h1>
+      <p>Choisis ton prénom pour voir tes comptes</p>
+      {vas.length===0 && <div className="empty">Aucune VA enregistrée. Demande à Awen de t'ajouter.</div>}
+      {vas.map(v=>
+        <button key={v.id} className="btn q" style={{width:"100%",marginBottom:8,padding:13}}
+          onClick={()=>onPick(v.name)}>{v.name}</button>)}
+      <button className="btn q s" style={{marginTop:8}} onClick={back}>Retour</button>
+    </div></div>
   );
 }
 
-function PickVa({ vas, onPick, logout }) {
+/* ============================================================
+   HÉROS + PALIER
+   ============================================================ */
+function Hero({ views30, views7, views15, dv7, dv30, accounts, tracked }){
+  const t = tierOf(views30);
+  const [w,setW] = useState(0);
+  useEffect(()=>{ const id=setTimeout(()=>setW(t.pct),120); return ()=>clearTimeout(id); },[t.pct]);
   return (
-    <div className="login">
-      <div className="login-box" style={{width:340}}>
-        <h1>Qui es-tu ?</h1>
-        <p>Choisis ton nom pour voir tes comptes</p>
-        {vas.length === 0 &&
-          <div className="mut" style={{fontSize:13,marginBottom:16}}>
-            Aucune VA enregistrée — demande à Awen de t'ajouter dans Réglages.
-          </div>}
-        {vas.map(v=>
-          <button key={v.id} className="btn ghost" style={{width:"100%",marginBottom:8,padding:"11px"}}
-            onClick={()=>onPick(v.name)}>{v.name}</button>)}
-        <button className="btn ghost sm" style={{marginTop:10}} onClick={logout}>← Retour</button>
+    <div className="hero">
+      <div className="hero-in">
+        <div className="hero-main">
+          <div className="hero-label">Vues sur 30 jours · {accounts} compte{accounts>1?"s":""}</div>
+          <div className="hero-num grad-txt"><Num n={views30}/></div>
+          <div className="hero-sub">
+            <Delta n={dv30}/>
+            <span style={{color:"var(--mut-2)"}}>vs les 30 jours précédents</span>
+          </div>
+        </div>
+        <div className="tier">
+          <div className="tier-top">
+            <span className="tier-name">{t.cur.name}</span>
+            {t.next && <span className="tier-goal">vers {fmtTxt(t.next.at)}</span>}
+          </div>
+          <div className="track"><div className="fill" style={{width:w+"%"}}/></div>
+          <div className="tier-msg">{t.cur.msg}</div>
+        </div>
+      </div>
+      <div className="trio">
+        <div className="cell">
+          <div className="cell-l">Vues · 7 jours</div>
+          <div className="cell-v"><Num n={views7}/></div>
+          <div className="cell-d"><Delta n={dv7}/></div>
+        </div>
+        <div className="cell">
+          <div className="cell-l">Vues · 15 jours</div>
+          <div className="cell-v"><Num n={views15}/></div>
+          <div className="cell-d" style={{color:"var(--mut-2)",fontSize:12.5}}>moitié de la fenêtre 30 j</div>
+        </div>
+        <div className="cell">
+          <div className="cell-l">Historique</div>
+          <div className="cell-v"><Num n={tracked}/> <span style={{fontSize:14,color:"var(--mut)"}}>j</span></div>
+          <div className="cell-d" style={{color:"var(--mut-2)",fontSize:12.5}}>
+            {tracked>=30 ? "toutes les comparaisons sont actives" : "les Δ s'activent à 7 puis 30 jours"}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 /* ============================================================
-   FORMULAIRE COMPTE (ajout — commun admin/VA)
+   VUE ADMIN
    ============================================================ */
-function AddAccountForm({ models, vas, onDone, notify, compact, fixedVa }) {
-  const [username, setUsername] = useState("");
-  const [modelId, setModelId] = useState("");
-  const [device, setDevice] = useState("");
-  const [va, setVa] = useState(fixedVa || "");
-  const [startedOn, setStartedOn] = useState(todayStr());
-  const [busy, setBusy] = useState(false);
+function Admin({ settings, models, accounts, snaps, vas, refs, reload, say, out, toast }){
+  const [tab,setTab] = useState("dash");
+  const [period,setPeriod] = useState("30d");
+  const [detail,setDetail] = useState(null);
 
-  async function save() {
-    const u = cleanUsername(username);
-    if (!u) { notify("Username manquant"); return; }
-    setBusy(true);
-    const { error } = await db.from("accounts").insert({
-      username: u,
-      model_id: modelId || null,
-      device_ref: device || null,
-      va_name: (fixedVa || va) || null,
-      started_on: startedOn,
-    });
-    setBusy(false);
-    if (error) { notify(error.code==="23505" ? "Ce compte existe déjà" : "Erreur : "+error.message); return; }
-    setUsername(""); setDevice("");
-    notify("Compte ajouté ✓ — il sera relevé au prochain scan");
-    onDone && onDone();
-  }
+  const live = accounts.filter(a=>a.active);
+  const rows = useMemo(()=>live.map(a=>({a, st:stats(a,snaps)})),[accounts,snaps]);
+  const actifs = rows.filter(r=>r.a.status==="actif");
+  const seuil = Number(settings.seuil_vues||500);
 
-  return (
-    <div className="grid2">
-      <div className="field"><label>Username Instagram</label>
-        <input placeholder="@username" value={username} onChange={e=>setUsername(e.target.value)} /></div>
-      <div className="field"><label>Modèle</label>
-        <select value={modelId} onChange={e=>setModelId(e.target.value)}>
-          <option value="">— modèle —</option>
-          {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-        </select></div>
-      <div className="field"><label>Téléphone / device</label>
-        <input placeholder="ex : iPhoneX_01" value={device} onChange={e=>setDevice(e.target.value)} /></div>
-      {!compact && <div className="field"><label>VA</label>
-        <select value={va} onChange={e=>setVa(e.target.value)}>
-          <option value="">— VA —</option>
-          {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
-        </select></div>}
-      <div className="field"><label>Créé le</label>
-        <input type="date" value={startedOn} onChange={e=>setStartedOn(e.target.value)} /></div>
-      <div className="field" style={{display:"flex",alignItems:"flex-end"}}>
-        <button className="btn" disabled={busy} onClick={save} style={{width:"100%"}}>
-          {busy ? "…" : "Ajouter le compte"}</button></div>
-    </div>
-  );
-}
+  const totals = useMemo(()=>({
+    count: actifs.length,
+    views7: sumOf(actifs,r=>r.st.per("7d").views),
+    views15: sumOf(actifs,r=>r.st.per("15d").views),
+    views30: sumOf(actifs,r=>r.st.per("30d").views),
+    dv7: sumOf(actifs,r=>r.st.dViews("7d")),
+    dv30: sumOf(actifs,r=>r.st.dViews("30d")),
+    tracked: rows.reduce((m,r)=>Math.max(m,r.st.tracked||0),0),
+  }),[rows]);
 
-/* ============================================================
-   COMPTES DE RÉFÉRENCE (warm-up) — vue partagée
-   ============================================================ */
-function RefAccounts({ refs, admin, reload, notify }) {
-  const [market, setMarket] = useState("FR");
-  const [newUser, setNewUser] = useState("");
-  const [newLabel, setNewLabel] = useState("");
+  const byModel = useMemo(()=>models.filter(m=>m.active).map(m=>{
+    const g = actifs.filter(r=>r.a.model_id===m.id);
+    const likes = sumOf(g,r=>r.st.per(period).likes)||0;
+    const comments = sumOf(g,r=>r.st.per(period).comments)||0;
+    const reels = sumOf(g,r=>r.st.per(period).reels)||0;
+    const followers = sumOf(g,r=>r.st.latest?.followers);
+    return { m, count:g.length,
+      v7:sumOf(g,r=>r.st.per("7d").views), v30:sumOf(g,r=>r.st.per("30d").views),
+      dv:sumOf(g,r=>r.st.dViews(period)), reels, likes, comments, followers,
+      dFol:sumOf(g,r=>r.st.d7),
+      eng:(followers>0&&reels>0&&(likes||comments))?(((likes+comments)/reels)/followers)*100:null };
+  }).sort((x,y)=>(y.v30||0)-(x.v30||0)),[models,rows,period]);
 
-  const list = refs.filter(r => r.active && r.market === market);
+  const byVa = useMemo(()=>{
+    const names = new Set(actifs.filter(r=>r.a.va_name).map(r=>r.a.va_name));
+    vas.filter(v=>v.active).forEach(v=>names.add(v.name));
+    return [...names].map(name=>{
+      const g = actifs.filter(r=>r.a.va_name===name);
+      return { name, count:g.length,
+        v7:sumOf(g,r=>r.st.per("7d").views), v30:sumOf(g,r=>r.st.per("30d").views),
+        dv:sumOf(g,r=>r.st.dViews(period)),
+        reels:sumOf(g,r=>r.st.per(period).reels), comments:sumOf(g,r=>r.st.per(period).comments),
+        followers:sumOf(g,r=>r.st.latest?.followers), dFol:sumOf(g,r=>r.st.d7),
+        ko: rows.filter(r=>r.a.va_name===name&&(r.a.status==="banni"||r.a.status==="introuvable")).length };
+    }).sort((a,b)=>(b.v7||0)-(a.v7||0));
+  },[rows,vas,period]);
 
-  async function addRef() {
-    const u = cleanUsername(newUser);
-    if (!u) { notify("Username manquant"); return; }
-    const { error } = await db.from("ref_accounts").insert({ username: u, market, label: newLabel || null });
-    if (error) { notify(error.code==="23505" ? "Déjà dans la liste" : "Erreur : "+error.message); return; }
-    setNewUser(""); setNewLabel(""); notify("Ajouté ✓"); reload();
-  }
-  async function removeRef(r) {
-    if (!confirm(`Retirer @${r.username} de la liste ${r.market} ?`)) return;
-    await db.from("ref_accounts").update({ active:false }).eq("id", r.id);
-    notify("Retiré"); reload();
-  }
+  const orphelins = actifs.filter(r=>!r.a.va_name).length;
+  const sansModele = actifs.filter(r=>!r.a.model_id).length;
+
+  const alerts = useMemo(()=>{
+    const out=[];
+    for(const {a,st} of rows){
+      if(a.status==="introuvable") out.push({t:"introuvable",a,txt:`Introuvable depuis le ${fmtDate(a.status_changed_on)}. Banni probable — à vérifier sur le téléphone.`});
+      if(a.status==="banni") out.push({t:"banni",a,txt:"Banni. Supprime le container, recrée-en un, puis archive ce compte ici."});
+      if(a.status==="actif" && ageDays(a.started_on)>=14){
+        const m=st.per("30d");
+        if(m.avg!==null && m.avg<seuil)
+          out.push({t:"eval",a,txt:`${ageDays(a.started_on)} jours, ${fmtTxt(m.avg)} vues en moyenne par reel (seuil ${fmtTxt(seuil)}). À supprimer et refaire ?`});
+      }
+      if(a.status==="actif" && ageDays(a.started_on)>=7 && st.latest && st.latest.reels_7d===0)
+        out.push({t:"muet",a,txt:"Aucun reel publié depuis 7 jours. Le compte est-il bien traité ?"});
+    }
+    return out;
+  },[rows,seuil]);
+
+  const NAV=[["dash","Tableau de bord"],["comptes","Comptes"],["refs","Comptes à suivre"],
+             ["alertes",`Alertes${alerts.length?` · ${alerts.length}`:""}`],["reglages","Réglages"]];
 
   return (
     <div>
-      <div className="row" style={{marginBottom:14}}>
-        {["FR","US"].map(m =>
-          <button key={m} className={"tab"+(market===m?" on":"")} onClick={()=>setMarket(m)}
-            style={{border:"1px solid var(--border)"}}>
-            Modèles {m} ({refs.filter(r=>r.active && r.market===m).length})
-          </button>)}
+      <div className="bar">
+        <div className="logo"><span className="dot"/>Sensual Aura</div>
+        <div className="nav">
+          {NAV.map(([k,l])=><button key={k} data-on={tab===k?"1":"0"} onClick={()=>setTab(k)}>{l}</button>)}
+        </div>
+        <button className="btn q s" onClick={out}>Quitter</button>
       </div>
 
-      {admin &&
-        <div className="panel">
-          <div className="panel-head"><div className="bar"/><h2>AJOUTER UN COMPTE DE RÉFÉRENCE ({market})</h2></div>
-          <div style={{padding:18}}>
-            <div className="grid2">
-              <div className="field"><label>Username Instagram</label>
-                <input placeholder="@username" value={newUser} onChange={e=>setNewUser(e.target.value)}/></div>
-              <div className="field"><label>Note (optionnel)</label>
-                <input placeholder="ex : gros compte lingerie" value={newLabel} onChange={e=>setNewLabel(e.target.value)}/></div>
+      <div className="wrap">
+        {tab==="dash" && <>
+          <Hero views30={totals.views30} views7={totals.views7} views15={totals.views15}
+            dv7={totals.dv7} dv30={totals.dv30} accounts={totals.count} tracked={totals.tracked}/>
+
+          <div className="panel">
+            <div className="ph">
+              <h2>Par modèle</h2>
+              <div style={{flex:1}}/>
+              <Seg value={period} onChange={setPeriod} options={PERIODS}/>
             </div>
-            <button className="btn" style={{marginTop:12}} onClick={addRef}>Ajouter à la liste {market}</button>
+            <div className="scroll"><table>
+              <thead><tr>
+                <th>Modèle</th><th className="r">Comptes</th>
+                <th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
+                <th className="r">Δ vues</th><th className="r">Reels</th>
+                <th className="r">Commentaires</th><th className="r">Engagement</th>
+                <th className="r">Abonnés</th><th className="r">Δ abonnés 7 j</th>
+              </tr></thead>
+              <tbody>
+                {byModel.length===0 && <tr><td colSpan="10" className="empty">Ajoute tes modèles dans Réglages.</td></tr>}
+                {byModel.map(r=>
+                  <tr key={r.m.id}>
+                    <td><div className="who">{r.m.name}</div><div className="sub">{r.count} actif{r.count>1?"s":""}</div></td>
+                    <td className="r num">{r.count}</td>
+                    <td className="r"><Num n={r.v7} style={{color:"var(--amber)",fontWeight:700}}/></td>
+                    <td className="r"><Num n={r.v30} style={{fontWeight:700}}/></td>
+                    <td className="r"><Delta n={r.dv}/></td>
+                    <td className="r num">{r.reels ?? "—"}</td>
+                    <td className="r"><Num n={r.comments}/></td>
+                    <td className="r num">{r.eng!=null ? r.eng.toFixed(1).replace(".",",")+" %" : "—"}</td>
+                    <td className="r"><Num n={r.followers}/></td>
+                    <td className="r"><Delta n={r.dFol}/></td>
+                  </tr>)}
+                {sansModele>0 && <tr><td colSpan="10" style={{color:"var(--amber)",fontSize:13}}>
+                  {sansModele} compte(s) actif(s) sans modèle — assigne-les dans l'onglet Comptes.</td></tr>}
+              </tbody>
+            </table></div>
           </div>
-        </div>}
+
+          <div className="panel">
+            <div className="ph"><h2>Par VA</h2><span className="hint">période : {(PERIODS.find(p=>p.key===period)||{}).label}</span></div>
+            <div className="scroll"><table>
+              <thead><tr>
+                <th>VA</th><th className="r">Comptes</th>
+                <th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
+                <th className="r">Δ vues</th><th className="r">Reels</th>
+                <th className="r">Commentaires</th><th className="r">Abonnés</th>
+                <th className="r">Δ abonnés 7 j</th><th className="r">Perdus</th>
+              </tr></thead>
+              <tbody>
+                {byVa.length===0 && <tr><td colSpan="10" className="empty">Ajoute tes VA dans Réglages.</td></tr>}
+                {byVa.map(r=>
+                  <tr key={r.name}>
+                    <td className="who">{r.name}</td>
+                    <td className="r num">{r.count}</td>
+                    <td className="r"><Num n={r.v7} style={{color:"var(--amber)",fontWeight:700}}/></td>
+                    <td className="r"><Num n={r.v30} style={{fontWeight:700}}/></td>
+                    <td className="r"><Delta n={r.dv}/></td>
+                    <td className="r num">{r.reels ?? "—"}</td>
+                    <td className="r"><Num n={r.comments}/></td>
+                    <td className="r"><Num n={r.followers}/></td>
+                    <td className="r"><Delta n={r.dFol}/></td>
+                    <td className="r num" style={{color:r.ko?"var(--coral)":"var(--mut-2)"}}>{r.ko||"—"}</td>
+                  </tr>)}
+                {orphelins>0 && <tr><td colSpan="10" style={{color:"var(--amber)",fontSize:13}}>
+                  {orphelins} compte(s) actif(s) sans VA assignée.</td></tr>}
+              </tbody>
+            </table></div>
+          </div>
+
+          <div className="panel">
+            <div className="ph"><h2>Meilleurs comptes</h2><span className="hint">classés sur 7 jours</span></div>
+            <div className="scroll"><table>
+              <thead><tr>
+                <th>Compte</th><th>Modèle</th><th className="r">Vues 7 j</th>
+                <th className="r">Vues 30 j</th><th className="r">Moyenne par reel</th>
+                <th className="r">Abonnés</th><th className="r">Δ abonnés 7 j</th>
+              </tr></thead>
+              <tbody>
+                {actifs.length===0 && <tr><td colSpan="7" className="empty">Aucun compte actif pour l'instant.</td></tr>}
+                {[...actifs].sort((a,b)=>((b.st.per("7d").views??0)-(a.st.per("7d").views??0))).slice(0,10).map(({a,st})=>
+                  <tr key={a.id} className="tap" onClick={()=>setDetail({a,st})}>
+                    <td className="who">@{a.username}</td>
+                    <td style={{color:"var(--mut)"}}>{models.find(m=>m.id===a.model_id)?.name||"—"}</td>
+                    <td className="r"><Num n={st.per("7d").views} style={{color:"var(--amber)",fontWeight:700}}/></td>
+                    <td className="r"><Num n={st.per("30d").views}/></td>
+                    <td className="r"><Num n={st.per("30d").avg}/></td>
+                    <td className="r"><Num n={st.latest?.followers}/></td>
+                    <td className="r"><Delta n={st.d7}/></td>
+                  </tr>)}
+              </tbody>
+            </table></div>
+          </div>
+        </>}
+
+        {tab==="comptes" && <Comptes rows={rows} models={models} vas={vas} open={setDetail} reload={reload} say={say}/>}
+        {tab==="refs" && <Refs refs={refs} admin reload={reload} say={say}/>}
+        {tab==="alertes" && <Alertes alerts={alerts} open={a=>setDetail({a,st:stats(a,snaps)})}/>}
+        {tab==="reglages" && <Reglages settings={settings} models={models} vas={vas} accounts={accounts} reload={reload} say={say}/>}
+      </div>
+
+      {detail && <Detail data={detail} models={models} vas={vas} snaps={snaps}
+        close={()=>setDetail(null)} reload={reload} say={say}/>}
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+/* ============================================================
+   FORMULAIRE D'AJOUT
+   ============================================================ */
+function AddAccount({ models, vas, onDone, say, fixedVa }){
+  const [u,setU]=useState(""), [mid,setMid]=useState(""), [dev,setDev]=useState("");
+  const [va,setVa]=useState(fixedVa||""), [on,setOn]=useState(todayStr()), [busy,setBusy]=useState(false);
+  async function save(){
+    const name = cleanUsername(u);
+    if(!name){ say("Il manque le nom du compte"); return; }
+    setBusy(true);
+    const { error } = await db.from("accounts").insert({
+      username:name, model_id:mid||null, device_ref:dev||null,
+      va_name:(fixedVa||va)||null, started_on:on });
+    setBusy(false);
+    if(error){ say(error.code==="23505" ? "Ce compte est déjà suivi" : "Erreur : "+error.message); return; }
+    setU(""); setDev(""); say(`@${name} ajouté — il sera relevé cette nuit`); onDone && onDone();
+  }
+  return (
+    <div className="g2">
+      <div className="fld"><label>Nom du compte</label>
+        <input placeholder="@username" value={u} onChange={e=>setU(e.target.value)}
+          onKeyDown={e=>{if(e.key==="Enter")save();}}/></div>
+      <div className="fld"><label>Modèle</label>
+        <select value={mid} onChange={e=>setMid(e.target.value)}>
+          <option value="">à choisir</option>
+          {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+        </select></div>
+      <div className="fld"><label>Téléphone</label>
+        <input placeholder="iPhoneX_01" value={dev} onChange={e=>setDev(e.target.value)}/></div>
+      {!fixedVa && <div className="fld"><label>VA</label>
+        <select value={va} onChange={e=>setVa(e.target.value)}>
+          <option value="">à choisir</option>
+          {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+        </select></div>}
+      <div className="fld"><label>Créé le</label>
+        <input type="date" value={on} onChange={e=>setOn(e.target.value)}/></div>
+      <div className="fld" style={{display:"flex",alignItems:"flex-end"}}>
+        <button className="btn" style={{width:"100%",padding:11}} disabled={busy} onClick={save}>
+          {busy?"…":"Ajouter le compte"}</button></div>
+    </div>
+  );
+}
+
+/* ============================================================
+   ONGLET COMPTES
+   ============================================================ */
+function Comptes({ rows, models, vas, open, reload, say }){
+  const [q,setQ]=useState(""), [fm,setFm]=useState(""), [fv,setFv]=useState(""), [fs,setFs]=useState("");
+  const [add,setAdd]=useState(false);
+  const list = rows.filter(({a})=>{
+    if(q && !a.username.includes(q.toLowerCase().replace("@",""))) return false;
+    if(fm==="none" && a.model_id) return false;
+    if(fm && fm!=="none" && a.model_id!==fm) return false;
+    if(fv==="none" && a.va_name) return false;
+    if(fv && fv!=="none" && a.va_name!==fv) return false;
+    if(fs && a.status!==fs) return false;
+    return true;
+  });
+  const set = async (a,patch)=>{ await db.from("accounts").update(patch).eq("id",a.id); reload(); };
+  return (
+    <div>
+      <div className="row" style={{marginBottom:14}}>
+        <input placeholder="Chercher un compte" value={q} onChange={e=>setQ(e.target.value)} style={{maxWidth:210}}/>
+        <select value={fm} onChange={e=>setFm(e.target.value)} style={{maxWidth:165}}>
+          <option value="">Tous les modèles</option><option value="none">Sans modèle</option>
+          {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+        <select value={fv} onChange={e=>setFv(e.target.value)} style={{maxWidth:150}}>
+          <option value="">Toutes les VA</option><option value="none">Sans VA</option>
+          {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+        </select>
+        <select value={fs} onChange={e=>setFs(e.target.value)} style={{maxWidth:145}}>
+          <option value="">Tous les statuts</option>
+          {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+        </select>
+        <div style={{flex:1}}/>
+        <button className="btn" onClick={()=>setAdd(!add)}>{add?"Fermer":"Ajouter un compte"}</button>
+      </div>
+
+      {add && <div className="panel"><div className="pad">
+        <AddAccount models={models} vas={vas} onDone={reload} say={say}/></div></div>}
 
       <div className="panel">
-        <div className="panel-head"><div className="bar"/><h2>À SUIVRE PENDANT LE WARM-UP — {market}</h2>
-          <span className="hint">{list.length} compte(s)</span></div>
-        {list.length === 0 ?
-          <div style={{padding:22,textAlign:"center"}} className="mut">
-            Aucun compte {market} dans la liste pour l'instant.
-          </div> :
-          <table>
-            <thead><tr><th>Compte</th><th className="hide-m">Note</th><th></th></tr></thead>
-            <tbody>
-              {list.map(r=>
+        <div className="ph"><h2>Tous les comptes</h2><span className="hint">{list.length} affiché{list.length>1?"s":""} · clique une ligne pour le détail</span></div>
+        <div className="scroll"><table>
+          <thead><tr>
+            <th>Compte</th><th>Modèle</th><th>VA</th><th>Statut</th>
+            <th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
+            <th className="r">Abonnés</th><th className="r">Δ 7 j</th>
+            <th>Note</th><th className="r">Âge</th>
+          </tr></thead>
+          <tbody>
+            {list.length===0 && <tr><td colSpan="10" className="empty">Aucun compte ne correspond. Change les filtres ou ajoute un compte.</td></tr>}
+            {list.map(({a,st})=>
+              <tr key={a.id} className="tap" onClick={()=>open({a,st})}>
+                <td><div className="who">@{a.username}</div>
+                    {a.device_ref && <div className="sub">{a.device_ref}</div>}</td>
+                <td onClick={e=>e.stopPropagation()}>
+                  <select value={a.model_id||""} onChange={e=>set(a,{model_id:e.target.value||null})}
+                    style={{padding:"6px 9px",fontSize:13,width:130}}>
+                    <option value="">—</option>
+                    {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select></td>
+                <td onClick={e=>e.stopPropagation()}>
+                  <select value={a.va_name||""} onChange={e=>set(a,{va_name:e.target.value||null})}
+                    style={{padding:"6px 9px",fontSize:13,width:120}}>
+                    <option value="">—</option>
+                    {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+                  </select></td>
+                <td><Status a={a}/></td>
+                <td className="r"><Num n={st.per("7d").views} style={{color:"var(--amber)",fontWeight:700}}/></td>
+                <td className="r"><Num n={st.per("30d").views}/></td>
+                <td className="r"><Num n={st.latest?.followers}/></td>
+                <td className="r"><Delta n={st.d7}/></td>
+                <td onClick={e=>e.stopPropagation()}><Stars value={a.rating} onChange={r=>set(a,{rating:r})}/></td>
+                <td className="r num" style={{color:"var(--mut)"}}>{ageDays(a.started_on)} j</td>
+              </tr>)}
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   COMPTES À SUIVRE (warm-up)
+   ============================================================ */
+function Refs({ refs, admin, reload, say }){
+  const [market,setMarket]=useState("FR");
+  const [u,setU]=useState(""), [lab,setLab]=useState("");
+  const list = refs.filter(r=>r.active && r.market===market);
+  async function add(){
+    const name=cleanUsername(u);
+    if(!name){ say("Il manque le nom du compte"); return; }
+    const { error } = await db.from("ref_accounts").insert({ username:name, market, label:lab||null });
+    if(error){ say(error.code==="23505"?"Déjà dans la liste":"Erreur : "+error.message); return; }
+    setU(""); setLab(""); say("Ajouté à la liste "+market); reload();
+  }
+  async function del(r){
+    if(!confirm(`Retirer @${r.username} de la liste ${r.market} ?`)) return;
+    await db.from("ref_accounts").update({active:false}).eq("id",r.id); say("Retiré"); reload();
+  }
+  return (
+    <div>
+      <div className="row" style={{marginBottom:14}}>
+        <Seg value={market} onChange={setMarket} options={[
+          {key:"FR",label:`France · ${refs.filter(r=>r.active&&r.market==="FR").length}`},
+          {key:"US",label:`États-Unis · ${refs.filter(r=>r.active&&r.market==="US").length}`}]}/>
+      </div>
+      {admin && <div className="panel"><div className="pad">
+        <div className="g2">
+          <div className="fld"><label>Compte à suivre</label>
+            <input placeholder="@username" value={u} onChange={e=>setU(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter")add();}}/></div>
+          <div className="fld"><label>Note</label>
+            <input placeholder="gros compte lingerie" value={lab} onChange={e=>setLab(e.target.value)}/></div>
+        </div>
+        <button className="btn" style={{marginTop:12}} onClick={add}>Ajouter à la liste {market}</button>
+      </div></div>}
+      <div className="panel">
+        <div className="ph"><h2>À suivre pendant le warm-up</h2><span className="hint">marché {market==="FR"?"français":"américain"}</span></div>
+        {list.length===0
+          ? <div className="empty">Rien dans cette liste pour l'instant.{admin?" Ajoute les comptes que les VA doivent suivre.":""}</div>
+          : <div className="scroll"><table>
+              <thead><tr><th>Compte</th><th>Note</th><th className="r"></th></tr></thead>
+              <tbody>{list.map(r=>
                 <tr key={r.id}>
-                  <td><a href={"https://instagram.com/"+r.username} target="_blank" rel="noreferrer">@{r.username}</a></td>
-                  <td className="hide-m mut">{r.label || "—"}</td>
-                  <td className="r">
-                    {admin && <button className="btn danger sm" onClick={()=>removeRef(r)}>Retirer</button>}
-                  </td>
-                </tr>)}
-            </tbody>
-          </table>}
+                  <td className="who"><a href={"https://instagram.com/"+r.username} target="_blank" rel="noreferrer">@{r.username}</a></td>
+                  <td style={{color:"var(--mut)"}}>{r.label||"—"}</td>
+                  <td className="r">{admin && <button className="btn d s" onClick={()=>del(r)}>Retirer</button>}</td>
+                </tr>)}</tbody>
+            </table></div>}
+      </div>
+      <div style={{color:"var(--mut-2)",fontSize:13,padding:"0 4px"}}>
+        À chaque nouveau compte : suis ces profils pendant le warm-up, scrolle leur fil et regarde quelques stories.
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   ALERTES
+   ============================================================ */
+function Alertes({ alerts, open }){
+  const col={introuvable:"var(--amber)",banni:"var(--coral)",eval:"var(--magenta)",muet:"var(--mut)"};
+  if(!alerts.length) return <div className="panel"><div className="empty">
+    Rien à traiter. Tous les comptes tournent normalement.</div></div>;
+  return (
+    <div className="panel">
+      <div className="ph"><h2>À traiter</h2><span className="hint">{alerts.length} point{alerts.length>1?"s":""}</span></div>
+      {alerts.map((al,i)=>
+        <div className="alert" key={i} style={{cursor:"pointer"}} onClick={()=>open(al.a)}>
+          <span className="bead" style={{background:col[al.t]}}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div className="who">@{al.a.username}</div>
+            <div style={{color:"var(--mut)",fontSize:13.5,marginTop:2}}>{al.txt}</div>
+          </div>
+        </div>)}
+    </div>
+  );
+}
+
+/* ============================================================
+   DÉTAIL D'UN COMPTE
+   ============================================================ */
+function Detail({ data, models, vas, snaps, close, reload, say }){
+  const a = data.a;
+  const st = data.st || stats(a,snaps);
+  const [e,setE] = useState({ model_id:a.model_id||"", device_ref:a.device_ref||"", va_name:a.va_name||"",
+    started_on:a.started_on, status:a.status, notes:a.notes||"" });
+  const t = tierOf(st.per("30d").views);
+
+  async function save(){
+    const patch={...e, model_id:e.model_id||null};
+    if(patch.status!==a.status) patch.status_changed_on=todayStr();
+    const { error } = await db.from("accounts").update(patch).eq("id",a.id);
+    if(error) say("Erreur : "+error.message);
+    else { say("Enregistré"); reload(); close(); }
+  }
+  async function archive(){
+    if(!confirm(`Archiver @${a.username} ? Il sort des listes, les données restent.`)) return;
+    await db.from("accounts").update({active:false,status:"supprime",status_changed_on:todayStr()}).eq("id",a.id);
+    say("Compte archivé"); reload(); close();
+  }
+  return (
+    <div className="ov" onClick={close}>
+      <div className="modal" onClick={ev=>ev.stopPropagation()}>
+        <div className="row" style={{marginBottom:16}}>
+          <h2 style={{fontSize:20,fontWeight:700,flex:1}}>@{a.username}</h2>
+          <a className="btn q s" href={"https://instagram.com/"+a.username} target="_blank" rel="noreferrer">Ouvrir Instagram</a>
+          <button className="btn q s" onClick={close}>Fermer</button>
+        </div>
+
+        <div className="hero" style={{marginBottom:16}}>
+          <div className="hero-in" style={{padding:"20px 20px 16px"}}>
+            <div className="hero-main">
+              <div className="hero-label">Vues sur 30 jours</div>
+              <div className="hero-num grad-txt" style={{fontSize:"clamp(38px,8vw,56px)"}}>
+                <Num n={st.per("30d").views}/></div>
+              <div className="hero-sub"><Delta n={st.dViews("30d")}/>
+                <span style={{color:"var(--mut-2)"}}>{ageDays(a.started_on)} jours d'existence</span></div>
+            </div>
+            <div className="tier">
+              <div className="tier-top"><span className="tier-name">{t.cur.name}</span>
+                {t.next && <span className="tier-goal">vers {fmtTxt(t.next.at)}</span>}</div>
+              <div className="track"><div className="fill" style={{width:t.pct+"%"}}/></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="ph"><h2>Chiffres par période</h2></div>
+          <div className="scroll"><table style={{minWidth:520}}>
+            <thead><tr><th>Période</th><th className="r">Reels</th><th className="r">Vues</th>
+              <th className="r">Moyenne</th><th className="r">Likes</th>
+              <th className="r">Commentaires</th><th className="r">Engagement</th></tr></thead>
+            <tbody>{PERIODS.map(p=>{ const m=st.per(p.key); return (
+              <tr key={p.key}>
+                <td className="who">{p.label}</td>
+                <td className="r num">{m.reels ?? "—"}</td>
+                <td className="r"><Num n={m.views} style={{fontWeight:700}}/></td>
+                <td className="r"><Num n={m.avg}/></td>
+                <td className="r"><Num n={m.likes}/></td>
+                <td className="r"><Num n={m.comments}/></td>
+                <td className="r num">{m.eng!=null ? m.eng.toFixed(1).replace(".",",")+" %" : "—"}</td>
+              </tr>); })}</tbody>
+          </table></div>
+        </div>
+
+        <div className="panel">
+          <div className="ph"><h2>Abonnés</h2>
+            <span className="hint">{st.latest?.followers!=null ? fmtTxt(st.latest.followers)+" aujourd'hui" : ""}</span></div>
+          <div style={{padding:"12px 14px"}}><Spark series={st.series||[]}/></div>
+        </div>
+
+        <div className="g2">
+          <div className="fld"><label>Modèle</label>
+            <select value={e.model_id} onChange={ev=>setE({...e,model_id:ev.target.value})}>
+              <option value="">à choisir</option>
+              {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+            </select></div>
+          <div className="fld"><label>Statut</label>
+            <select value={e.status} onChange={ev=>setE({...e,status:ev.target.value})}>
+              {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+            </select></div>
+          <div className="fld"><label>Téléphone</label>
+            <input value={e.device_ref} onChange={ev=>setE({...e,device_ref:ev.target.value})}/></div>
+          <div className="fld"><label>VA</label>
+            <select value={e.va_name} onChange={ev=>setE({...e,va_name:ev.target.value})}>
+              <option value="">à choisir</option>
+              {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+            </select></div>
+          <div className="fld"><label>Créé le</label>
+            <input type="date" value={e.started_on} onChange={ev=>setE({...e,started_on:ev.target.value})}/></div>
+          <div className="fld"><label>Notes</label>
+            <input value={e.notes} onChange={ev=>setE({...e,notes:ev.target.value})}/></div>
+        </div>
+
+        <div className="row" style={{marginTop:16}}>
+          <button className="btn" onClick={save}>Enregistrer</button>
+          <div style={{flex:1}}/>
+          <button className="btn d s" onClick={archive}>Archiver</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   RÉGLAGES
+   ============================================================ */
+function Reglages({ settings, models, vas, accounts, reload, say }){
+  const [aPin,setAPin]=useState(String(settings.admin_pin||""));
+  const [vPin,setVPin]=useState(String(settings.va_pin||""));
+  const [seuil,setSeuil]=useState(String(settings.seuil_vues||500));
+  const [nm,setNm]=useState(""), [nv,setNv]=useState("");
+  const [busy,setBusy]=useState(false), [log,setLog]=useState([]);
+
+  useEffect(()=>{ db.from("scan_log").select("*").order("ran_at",{ascending:false}).limit(5)
+    .then(({data})=>setLog(data||[])); },[]);
+
+  async function saveS(){
+    const { error } = await db.from("app_settings")
+      .update({ data:{...settings, admin_pin:aPin, va_pin:vPin, seuil_vues:Number(seuil)||500} }).eq("id",1);
+    if(error) say("Erreur : "+error.message); else { say("Réglages enregistrés"); reload(); }
+  }
+  async function addModel(){ const n=nm.trim(); if(!n)return;
+    const {error}=await db.from("models").insert({name:n});
+    if(error) say(error.code==="23505"?"Ce modèle existe déjà":"Erreur : "+error.message);
+    else { setNm(""); say("Modèle ajouté"); reload(); } }
+  async function addVa(){ const n=nv.trim(); if(!n)return;
+    const {error}=await db.from("vas").insert({name:n});
+    if(error) say(error.code==="23505"?"Cette VA existe déjà":"Erreur : "+error.message);
+    else { setNv(""); say("VA ajoutée"); reload(); } }
+  async function rename(table,row){ const n=prompt("Nouveau nom",row.name); if(!n||!n.trim())return;
+    await db.from(table).update({name:n.trim()}).eq("id",row.id);
+    if(table==="vas") await db.from("accounts").update({va_name:n.trim()}).eq("va_name",row.name);
+    say("Renommé"); reload(); }
+  async function toggle(table,row){ await db.from(table).update({active:!row.active}).eq("id",row.id); reload(); }
+
+  async function scan(){
+    setBusy(true);
+    try{
+      const r = await fetch("/.netlify/functions/scrape-now",{method:"POST",
+        headers:{"Content-Type":"application/json"},body:JSON.stringify({pin:aPin})});
+      const j = await r.json();
+      say(j.ok ? "Relevé lancé — recharge la page dans deux minutes" : "Refusé : "+(j.error||""));
+    }catch{ say("Le serveur ne répond pas"); }
+    setBusy(false);
+  }
+
+  const Line = ({ table, row, count }) => (
+    <div className="row" style={{padding:"9px 0",borderBottom:"1px solid var(--line-soft)"}}>
+      <div style={{flex:1,opacity:row.active?1:.45}}>
+        <span className="who">{row.name}</span>
+        <span style={{color:"var(--mut-2)",fontSize:12.5,marginLeft:8}}>{count} compte{count>1?"s":""}</span>
+      </div>
+      <button className="btn q s" onClick={()=>rename(table,row)}>Renommer</button>
+      <button className="btn q s" onClick={()=>toggle(table,row)}>{row.active?"Désactiver":"Réactiver"}</button>
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="panel">
+        <div className="ph"><h2>Relevé des statistiques</h2></div>
+        <div className="pad">
+          <div className="row">
+            <button className="btn" disabled={busy} onClick={scan}>{busy?"…":"Relever maintenant"}</button>
+            <span style={{color:"var(--mut)",fontSize:13.5}}>
+              Le relevé automatique tourne chaque nuit à 4 h, heure de Bangkok.</span>
+          </div>
+          {log.length>0 && <div style={{marginTop:16}}>
+            {log.map(l=><div key={l.id} className="num" style={{color:"var(--mut-2)",fontSize:13}}>
+              {new Date(l.ran_at).toLocaleString("fr-FR",{timeZone:"Asia/Bangkok"})} — {l.accounts_scanned} comptes, {l.errors} erreur(s)</div>)}
+          </div>}
+        </div>
       </div>
 
-      <div className="mut" style={{fontSize:13,padding:"0 4px"}}>
-        À chaque nouveau compte créé : suivre ces comptes pendant le warm-up, puis scroller leur feed et regarder quelques stories.
+      <div className="panel">
+        <div className="ph"><h2>Modèles</h2></div>
+        <div className="pad">
+          <div className="row" style={{marginBottom:10}}>
+            <input placeholder="Nom de la modèle" value={nm} onChange={e=>setNm(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter")addModel();}} style={{maxWidth:230}}/>
+            <button className="btn" onClick={addModel}>Ajouter</button>
+          </div>
+          {models.length===0 && <div className="empty" style={{padding:"14px 0"}}>Aucun modèle pour l'instant.</div>}
+          {models.map(m=><Line key={m.id} table="models" row={m}
+            count={accounts.filter(a=>a.model_id===m.id&&a.active).length}/>)}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="ph"><h2>Assistantes</h2><span className="hint">chacune choisit son prénom en se connectant</span></div>
+        <div className="pad">
+          <div className="row" style={{marginBottom:10}}>
+            <input placeholder="Prénom" value={nv} onChange={e=>setNv(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter")addVa();}} style={{maxWidth:230}}/>
+            <button className="btn" onClick={addVa}>Ajouter</button>
+          </div>
+          {(vas||[]).length===0 && <div className="empty" style={{padding:"14px 0"}}>Aucune VA pour l'instant.</div>}
+          {(vas||[]).map(v=><Line key={v.id} table="vas" row={v}
+            count={accounts.filter(a=>a.va_name===v.name&&a.active).length}/>)}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="ph"><h2>Accès et seuils</h2></div>
+        <div className="pad">
+          <div className="g2">
+            <div className="fld"><label>Ton code</label>
+              <input value={aPin} onChange={e=>setAPin(e.target.value)}/></div>
+            <div className="fld"><label>Code des VA</label>
+              <input value={vPin} onChange={e=>setVPin(e.target.value)}/></div>
+            <div className="fld"><label>Seuil sous lequel un compte est considéré mort (vues par reel)</label>
+              <input type="number" value={seuil} onChange={e=>setSeuil(e.target.value)}/></div>
+          </div>
+          <button className="btn" style={{marginTop:14}} onClick={saveS}>Enregistrer</button>
+        </div>
       </div>
     </div>
   );
@@ -488,718 +1116,92 @@ function RefAccounts({ refs, admin, reload, notify }) {
 /* ============================================================
    VUE VA
    ============================================================ */
-function VaApp({ models, accounts, snaps, refs, vaName, reload, notify, logout, toast }) {
-  const [tab, setTab] = useState("comptes");
-
-  const mine = accounts.filter(a => a.active && a.status!=="supprime" && a.va_name === vaName);
-  const withStats = useMemo(()=>mine.map(a=>({ a, st: computeAccountStats(a, snaps) })), [accounts, snaps, vaName]);
-
-  const totals = useMemo(()=>{
-    const act = withStats.filter(x=>x.a.status==="actif");
-    const sum=(f)=>{let t=0,h=false;for(const r of act){const v=f(r);if(v!=null){t+=v;h=true;}}return h?t:null;};
-    return { count: act.length, followers: sum(r=>r.st.latest?.followers), d7: sum(r=>r.st.d7), views: sum(r=>r.st.latest?.views_30d) };
-  },[withStats]);
-
-  const byModel = useMemo(()=>{
-    const map = {};
-    for (const {a, st} of withStats) {
-      const m = models.find(x=>x.id===a.model_id);
-      const key = m ? m.name : "— sans modèle —";
-      (map[key] = map[key]||[]).push({a, st});
+function Va({ models, accounts, snaps, refs, vaName, reload, say, out, toast }){
+  const [tab,setTab]=useState("mes");
+  const mine = accounts.filter(a=>a.active && a.status!=="supprime" && a.va_name===vaName);
+  const rows = useMemo(()=>mine.map(a=>({a,st:stats(a,snaps)})),[accounts,snaps,vaName]);
+  const actifs = rows.filter(r=>r.a.status==="actif");
+  const tot = {
+    count:actifs.length,
+    views7:sumOf(actifs,r=>r.st.per("7d").views),
+    views15:sumOf(actifs,r=>r.st.per("15d").views),
+    views30:sumOf(actifs,r=>r.st.per("30d").views),
+    dv7:sumOf(actifs,r=>r.st.dViews("7d")),
+    dv30:sumOf(actifs,r=>r.st.dViews("30d")),
+    tracked:rows.reduce((m,r)=>Math.max(m,r.st.tracked||0),0),
+  };
+  const groups = useMemo(()=>{
+    const map={};
+    for(const r of rows){
+      const m=models.find(x=>x.id===r.a.model_id);
+      const k=m?m.name:"Sans modèle";
+      (map[k]=map[k]||[]).push(r);
     }
     return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0]));
-  },[withStats, models]);
+  },[rows,models]);
 
-  async function reportBanni(a) {
-    if (!confirm(`Marquer @${a.username} comme BANNI ?`)) return;
-    const { error } = await db.from("accounts").update({ status:"banni", status_changed_on: todayStr() }).eq("id", a.id);
-    if (error) notify("Erreur : "+error.message); else { notify("Signalé — Awen validera la suppression"); reload(); }
+  async function banni(a){
+    if(!confirm(`Signaler @${a.username} comme banni ?`)) return;
+    const { error } = await db.from("accounts").update({status:"banni",status_changed_on:todayStr()}).eq("id",a.id);
+    if(error) say("Erreur : "+error.message); else { say("Signalé. Awen validera la suppression."); reload(); }
   }
 
   return (
     <div>
-      <div className="topbar">
-        <div className="brand">Sensual <em>Aura</em> · {vaName}</div>
-        <div className="tabs">
-          {[["comptes","Mes comptes"],["refs","Comptes à suivre"]].map(([k,l])=>
-            <button key={k} className={"tab"+(tab===k?" on":"")} onClick={()=>setTab(k)}>{l}</button>)}
+      <div className="bar">
+        <div className="logo"><span className="dot"/>{vaName}</div>
+        <div className="nav">
+          <button data-on={tab==="mes"?"1":"0"} onClick={()=>setTab("mes")}>Mes comptes</button>
+          <button data-on={tab==="refs"?"1":"0"} onClick={()=>setTab("refs")}>Comptes à suivre</button>
         </div>
-        <button className="btn ghost sm" onClick={logout}>Quitter</button>
+        <button className="btn q s" onClick={out}>Quitter</button>
       </div>
 
       <div className="wrap">
-        {tab==="refs" && <RefAccounts refs={refs} admin={false} reload={reload} notify={notify} />}
+        {tab==="refs" && <Refs refs={refs} admin={false} reload={reload} say={say}/>}
 
-        {tab==="comptes" && <div>
-          <div className="panel">
-            <div className="panel-head"><div className="bar"/><h2>MES CHIFFRES</h2>
-              <span className="hint">uniquement tes comptes</span></div>
-            <table><tbody><tr>
-              <td><span className="mut">Mes comptes actifs</span><div className="num" style={{fontSize:22,fontWeight:700}}>{totals.count}</div></td>
-              <td><span className="mut">Followers cumulés</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.followers)}</div></td>
-              <td><span className="mut">Followers · Δ 7 jours</span><div style={{fontSize:22,fontWeight:700}}>{fmtDelta(totals.d7)}</div></td>
-              <td><span className="mut">Vues 30 j</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.views)}</div></td>
-            </tr></tbody></table>
-          </div>
+        {tab==="mes" && <>
+          <Hero views30={tot.views30} views7={tot.views7} views15={tot.views15}
+            dv7={tot.dv7} dv30={tot.dv30} accounts={tot.count} tracked={tot.tracked}/>
 
           <div className="panel">
-            <div className="panel-head"><div className="bar"/><h2>AJOUTER UN NOUVEAU COMPTE</h2>
-              <span className="hint">à faire à chaque création de compte</span></div>
-            <div style={{padding:18}}>
-              <AddAccountForm models={models} onDone={reload} notify={notify} fixedVa={vaName} compact />
-            </div>
+            <div className="ph"><h2>Ajouter un compte</h2><span className="hint">à chaque nouveau compte créé</span></div>
+            <div className="pad"><AddAccount models={models} onDone={reload} say={say} fixedVa={vaName}/></div>
           </div>
 
-          {byModel.length === 0 &&
-            <div className="panel"><div style={{padding:26,textAlign:"center"}} className="mut">
-              Aucun compte à ton nom pour l'instant. Ajoute-en un ci-dessus.
-            </div></div>}
+          {groups.length===0 && <div className="panel"><div className="empty">
+            Aucun compte à ton nom. Ajoute le premier ci-dessus.</div></div>}
 
-          {byModel.map(([modelName, list]) =>
-            <div className="panel" key={modelName}>
-              <div className="panel-head"><div className="bar"/><h2>{modelName.toUpperCase()}</h2>
-                <span className="hint">{list.length} compte(s)</span></div>
-              <table>
-                <thead><tr><th>Compte</th><th>Statut</th><th className="r">Followers</th><th className="r hide-m">Followers Δ 7 j</th><th className="r hide-m">Vues 30 j</th><th></th></tr></thead>
-                <tbody>
-                  {list.map(({a, st})=>
-                    <tr key={a.id}>
-                      <td>
-                        <a href={"https://instagram.com/"+a.username} target="_blank" rel="noreferrer">@{a.username}</a>
-                        {a.device_ref && <span className="mut" style={{fontSize:12,marginLeft:8}}>{a.device_ref}</span>}
-                      </td>
-                      <td><StatusBadge account={a} /></td>
-                      <td className="r num">{fmt(st.latest?.followers)}</td>
-                      <td className="r hide-m">{fmtDelta(st.d7)}</td>
-                      <td className="r num hide-m">{fmt(st.latest?.views_30d)}</td>
-                      <td className="r">
-                        {a.status==="actif" &&
-                          <button className="btn danger sm" onClick={()=>reportBanni(a)}>Banni</button>}
-                      </td>
-                    </tr>)}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>}
+          {groups.map(([name,list])=>
+            <div className="panel" key={name}>
+              <div className="ph"><h2>{name}</h2><span className="hint">{list.length} compte{list.length>1?"s":""}</span></div>
+              <div className="scroll"><table>
+                <thead><tr><th>Compte</th><th>Statut</th>
+                  <th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
+                  <th className="r">Abonnés</th><th className="r">Δ 7 j</th><th className="r"></th></tr></thead>
+                <tbody>{list.map(({a,st})=>
+                  <tr key={a.id}>
+                    <td><div className="who"><a href={"https://instagram.com/"+a.username} target="_blank" rel="noreferrer">@{a.username}</a></div>
+                        {a.device_ref && <div className="sub">{a.device_ref}</div>}</td>
+                    <td><Status a={a}/></td>
+                    <td className="r"><Num n={st.per("7d").views} style={{color:"var(--amber)",fontWeight:700}}/></td>
+                    <td className="r"><Num n={st.per("30d").views}/></td>
+                    <td className="r"><Num n={st.latest?.followers}/></td>
+                    <td className="r"><Delta n={st.d7}/></td>
+                    <td className="r">{a.status==="actif" &&
+                      <button className="btn d s" onClick={()=>banni(a)}>Signaler banni</button>}</td>
+                  </tr>)}</tbody>
+              </table></div>
+            </div>)}
+        </>}
       </div>
       {toast && <div className="toast">{toast}</div>}
-    </div>
-  );
-}
-
-/* ============================================================
-   VUE ADMIN
-   ============================================================ */
-function AdminApp({ settings, models, accounts, snaps, vas, refs, reload, notify, logout, toast }) {
-  const [tab, setTab] = useState("dash");
-  const [period, setPeriod] = useState("30d");
-  const [detail, setDetail] = useState(null);
-
-  const seuil = Number(settings.seuil_vues || 500);
-  const visible = accounts.filter(a=>a.active);
-  const withStats = useMemo(()=>visible.map(a=>({ a, st: computeAccountStats(a, snaps) })), [accounts, snaps]);
-
-  /* --- agrégats par modèle (comme le tableau STATS PAR MODÈLE) --- */
-  const modelRows = useMemo(()=>{
-    return models.filter(m=>m.active).map(m=>{
-      const rows = withStats.filter(x=>x.a.model_id===m.id && x.a.status==="actif");
-      const sum = (f)=>{ let t=0,has=false; for(const r of rows){ const v=f(r); if(v!=null){t+=v;has=true;} } return has?t:null; };
-      const followers = sum(r=>r.st.latest?.followers);
-      const likes = sum(r=>r.st.per(period).likes) || 0;
-      const comments = sum(r=>r.st.per(period).comments) || 0;
-      return {
-        model: m, count: rows.length,
-        followers,
-        d7: sum(r=>r.st.d7), d30: sum(r=>r.st.d30),
-        views: sum(r=>r.st.per(period).views),
-        views7: sum(r=>r.st.per("7d").views),
-        views30: sum(r=>r.st.per("30d").views),
-        dViews: sum(r=>(r.st.deltaViews ? r.st.deltaViews(period) : null)),
-        reels: sum(r=>r.st.per(period).reels),
-        likes, comments,
-        engagement: (followers > 0 && (likes||comments))
-          ? (() => { const r = rows.reduce((t,x)=>t+(x.st.per(period).reels||0),0);
-                     return r > 0 ? (((likes+comments)/r)/followers)*100 : null; })()
-          : null,
-      };
-    }).sort((x,y)=>(y.followers||0)-(x.followers||0));
-  },[models, withStats, period]);
-
-  /* --- agrégats par VA --- */
-  const vaRows = useMemo(()=>{
-    const names = new Set(withStats.filter(x=>x.a.va_name).map(x=>x.a.va_name));
-    for (const v of (vas||[])) if (v.active) names.add(v.name);
-    const rows = [...names].map(name=>{
-      const list = withStats.filter(x=>x.a.va_name===name && x.a.status==="actif");
-      const sum = (f)=>{ let t=0,has=false; for(const r of list){ const v=f(r); if(v!=null){t+=v;has=true;} } return has?t:null; };
-      return {
-        name, count: list.length,
-        followers: sum(r=>r.st.latest?.followers),
-        d7: sum(r=>r.st.d7),
-        d30: sum(r=>r.st.d30),
-        views: sum(r=>r.st.per(period).views),
-        views7: sum(r=>r.st.per("7d").views),
-        views30: sum(r=>r.st.per("30d").views),
-        dViews: sum(r=>(r.st.deltaViews ? r.st.deltaViews(period) : null)),
-        reels: sum(r=>r.st.per(period).reels),
-        likes: sum(r=>r.st.per(period).likes),
-        comments: sum(r=>r.st.per(period).comments),
-        bannis: withStats.filter(x=>x.a.va_name===name && (x.a.status==="banni"||x.a.status==="introuvable")).length,
-      };
-    }).sort((a,b)=>(b.views||0)-(a.views||0));
-    const orphan = withStats.filter(x=>!x.a.va_name && x.a.status==="actif").length;
-    return { rows, orphan };
-  },[withStats, vas, period]);
-
-  const noModel = withStats.filter(x=>!x.a.model_id && x.a.status==="actif").length;
-
-  /* --- alertes --- */
-  const alerts = useMemo(()=>{
-    const out = [];
-    for (const {a, st} of withStats) {
-      if (a.status === "introuvable")
-        out.push({ type:"introuvable", a, txt:`Introuvable depuis le ${fmtDate(a.status_changed_on)} — banni probable, à vérifier` });
-      if (a.status === "banni")
-        out.push({ type:"banni", a, txt:`Banni — à supprimer du téléphone puis archiver ici` });
-      if (a.status === "actif" && ageDays(a.started_on) >= 14) {
-        if (st.avgViews !== null && st.avgViews < seuil)
-          out.push({ type:"eval", a, txt:`${ageDays(a.started_on)} j — moyenne ${fmt(st.avgViews)} vues/reel (seuil ${fmt(seuil)}) → à supprimer et refaire ?` });
-      }
-      if (a.status === "actif" && ageDays(a.started_on) >= 7 && st.latest && st.latest.reels_30d === 0)
-        out.push({ type:"inactif", a, txt:`Aucun reel détecté sur 30 j — la VA poste bien sur ce compte ?` });
-    }
-    return out;
-  },[withStats, seuil]);
-
-  return (
-    <div>
-      <div className="topbar">
-        <div className="brand">Sensual <em>Aura</em> · Tracker</div>
-        <div className="tabs">
-          {[["dash","Dashboard"],["comptes","Comptes"],["refs","Comptes à suivre"],["alertes",`Alertes${alerts.length?` (${alerts.length})`:""}`],["reglages","Réglages"]].map(([k,l])=>
-            <button key={k} className={"tab"+(tab===k?" on":"")} onClick={()=>setTab(k)}>{l}</button>)}
-        </div>
-        <button className="btn ghost sm" onClick={logout}>Quitter</button>
-      </div>
-
-      <div className="wrap">
-        {tab==="dash" && <Dashboard modelRows={modelRows} vaRows={vaRows} noModel={noModel} withStats={withStats} setDetail={setDetail} models={models} period={period} setPeriod={setPeriod} />}
-        {tab==="comptes" && <Comptes withStats={withStats} models={models} vas={vas} setDetail={setDetail} reload={reload} notify={notify} />}
-        {tab==="refs" && <RefAccounts refs={refs} admin={true} reload={reload} notify={notify} />}
-        {tab==="alertes" && <Alertes alerts={alerts} setDetail={setDetail} />}
-        {tab==="reglages" && <Reglages settings={settings} models={models} accounts={accounts} vas={vas} reload={reload} notify={notify} />}
-      </div>
-
-      {detail && <AccountDetail data={detail} models={models} vas={vas} snaps={snaps} close={()=>setDetail(null)} reload={reload} notify={notify} />}
-      {toast && <div className="toast">{toast}</div>}
-    </div>
-  );
-}
-
-/* ---------- Onglet Dashboard ---------- */
-function Dashboard({ modelRows, vaRows, noModel, withStats, setDetail, models, period, setPeriod }) {
-  const plabel = (PERIODS.find(p=>p.key===period)||{}).label;
-  const maxDays = withStats.reduce((m,x)=>Math.max(m, x.st.daysTracked||0), 0);
-  const totals = useMemo(()=>{
-    const actifs = withStats.filter(x=>x.a.status==="actif");
-    const sum=(f)=>{let t=0,h=false;for(const r of actifs){const v=f(r);if(v!=null){t+=v;h=true;}}return h?t:null;};
-    return { count:actifs.length, followers:sum(r=>r.st.latest?.followers), d7:sum(r=>r.st.d7),
-      views:sum(r=>r.st.per(period).views), comments:sum(r=>r.st.per(period).comments), likes:sum(r=>r.st.per(period).likes),
-      d30:sum(r=>r.st.d30),
-      views7:sum(r=>r.st.per("7d").views), views30:sum(r=>r.st.per("30d").views), dViews:sum(r=>(r.st.deltaViews ? r.st.deltaViews(period) : null)) };
-  },[withStats, period]);
-
-  return (
-    <div>
-      <div className="panel">
-        <div className="panel-head"><div className="bar"/><h2>VUE D'ENSEMBLE</h2>
-          <PeriodPicker value={period} onChange={setPeriod} /></div>
-        <table>
-          <tbody>
-            <tr>
-              <td><span className="mut">Comptes actifs</span><div className="num" style={{fontSize:22,fontWeight:700}}>{totals.count}</div></td>
-              <td><span className="mut">Vues · 7 jours</span><div className="num" style={{fontSize:24,fontWeight:800,color:"var(--gold)"}}>{fmt(totals.views7)}</div></td>
-              <td><span className="mut">Vues · 30 jours</span><div className="num" style={{fontSize:24,fontWeight:800,color:"var(--gold)"}}>{fmt(totals.views30)}</div></td>
-              <td><span className="mut">Vues · {plabel} vs période précédente</span><div style={{fontSize:22,fontWeight:700}}>{fmtDelta(totals.dViews)}</div></td>
-              <td><span className="mut">Commentaires · {plabel}</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.comments)}</div></td>
-              <td><span className="mut">Followers</span><div className="num" style={{fontSize:22,fontWeight:700}}>{fmt(totals.followers)}</div></td>
-              <td><span className="mut">Fol. Δ 7 j / 30 j</span><div style={{fontSize:18,fontWeight:700}}>{fmtDelta(totals.d7)} <span className="mut" style={{fontSize:14}}>/</span> {fmtDelta(totals.d30)}</div></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {maxDays < 30 &&
-        <div className="panel" style={{borderColor:"var(--gold)"}}>
-          <div style={{padding:"13px 18px",fontSize:13.5}} className="mut">
-            Historique en cours de constitution : <strong style={{color:"var(--gold)"}}>{maxDays} jour(s)</strong> de suivi.
-            Le Δ 7 jours apparaîtra au 7<sup>e</sup> jour, le Δ 30 jours au 30<sup>e</sup>. Les vues et commentaires, eux, sont déjà exacts.
-          </div>
-        </div>}
-
-      <div className="panel">
-        <div className="panel-head"><div className="bar"/><h2>STATS PAR MODÈLE</h2>
-          <span className="hint">période : {plabel}</span></div>
-        <table>
-          <thead><tr>
-            <th>Modèle</th><th className="r">Comptes</th>
-            <th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
-            <th className="r">Δ vues ({plabel})</th>
-            <th className="r hide-m">Reels</th><th className="r">Comm.</th>
-            <th className="r hide-m">Engagement</th>
-            <th className="r">Followers</th><th className="r">Fol. Δ 7 j</th><th className="r hide-m">Fol. Δ 30 j</th>
-          </tr></thead>
-          <tbody>
-            {modelRows.map(r=>
-              <tr key={r.model.id}>
-                <td style={{fontWeight:600}}>{r.model.name}<div className="mut" style={{fontSize:12,fontWeight:400}}>{r.count} compte(s) actif(s)</div></td>
-                <td className="r num">{r.count}</td>
-                <td className="r num" style={{fontWeight:700,color:"var(--gold)"}}>{fmt(r.views7)}</td>
-                <td className="r num" style={{fontWeight:700}}>{fmt(r.views30)}</td>
-                <td className="r">{fmtDelta(r.dViews)}</td>
-                <td className="r num hide-m">{r.reels ?? "—"}</td>
-                <td className="r num" style={{fontWeight:600}}>{fmt(r.comments)}</td>
-                <td className="r num hide-m">{r.engagement!=null ? r.engagement.toFixed(1).replace(".",",")+" %" : "—"}</td>
-                <td className="r num" style={{fontWeight:600}}>{fmt(r.followers)}</td>
-                <td className="r">{fmtDelta(r.d7)}</td>
-                <td className="r hide-m">{fmtDelta(r.d30)}</td>
-              </tr>
-            )}
-            {noModel > 0 &&
-              <tr><td colSpan="12" className="mut" style={{fontSize:13}}>
-                ⚠ {noModel} compte(s) actif(s) sans modèle assigné — onglet Comptes pour les assigner
-              </td></tr>}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="panel">
-        <div className="panel-head"><div className="bar"/><h2>STATS PAR VA</h2>
-          <span className="hint">période : {plabel}</span></div>
-        <table>
-          <thead><tr>
-            <th>VA</th><th className="r">Comptes actifs</th>
-            <th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
-            <th className="r">Δ vues ({plabel})</th>
-            <th className="r hide-m">Reels</th><th className="r">Comm.</th>
-            <th className="r">Followers</th><th className="r">Fol. Δ 7 j</th><th className="r hide-m">Fol. Δ 30 j</th>
-            <th className="r hide-m">Bannis / introuvables</th>
-          </tr></thead>
-          <tbody>
-            {vaRows.rows.length === 0 &&
-              <tr><td colSpan="11" className="mut" style={{fontSize:13}}>
-                Aucune VA enregistrée — ajoute-les dans Réglages.
-              </td></tr>}
-            {vaRows.rows.map(r=>
-              <tr key={r.name}>
-                <td style={{fontWeight:600}}>{r.name}</td>
-                <td className="r num">{r.count}</td>
-                <td className="r num" style={{fontWeight:700,color:"var(--gold)"}}>{fmt(r.views7)}</td>
-                <td className="r num" style={{fontWeight:700}}>{fmt(r.views30)}</td>
-                <td className="r">{fmtDelta(r.dViews)}</td>
-                <td className="r num hide-m">{r.reels ?? "—"}</td>
-                <td className="r num" style={{fontWeight:600}}>{fmt(r.comments)}</td>
-                <td className="r num" style={{fontWeight:600}}>{fmt(r.followers)}</td>
-                <td className="r">{fmtDelta(r.d7)}</td>
-                <td className="r hide-m">{fmtDelta(r.d30)}</td>
-                <td className="r num hide-m">{r.bannis || "—"}</td>
-              </tr>)}
-            {vaRows.orphan > 0 &&
-              <tr><td colSpan="11" className="mut" style={{fontSize:13}}>
-                ⚠ {vaRows.orphan} compte(s) actif(s) sans VA assignée — onglet Comptes pour les assigner
-              </td></tr>}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="panel">
-        <div className="panel-head"><div className="bar"/><h2>TOP COMPTES (VUES 7 J)</h2></div>
-        <table>
-          <thead><tr><th>Compte</th><th className="hide-m">Modèle</th><th className="r">Vues 7 j</th><th className="r">Vues 30 j</th><th className="r hide-m">Moy./reel</th><th className="r">Followers</th><th className="r hide-m">Fol. Δ 7 j</th></tr></thead>
-          <tbody>
-            {[...withStats].filter(x=>x.a.status==="actif" && x.st.latest?.views_30d!=null)
-              .sort((a,b)=>((b.st.per("7d").views ?? b.st.latest.views_30d)||0)-((a.st.per("7d").views ?? a.st.latest.views_30d)||0)).slice(0,10)
-              .map(({a,st})=>
-                <tr key={a.id} className="click" onClick={()=>setDetail({a,st})}>
-                  <td>@{a.username}</td>
-                  <td className="hide-m mut">{models.find(m=>m.id===a.model_id)?.name || "—"}</td>
-                  <td className="r num" style={{fontWeight:700,color:"var(--gold)"}}>{fmt(st.per("7d").views)}</td>
-                  <td className="r num" style={{fontWeight:600}}>{fmt(st.per("30d").views)}</td>
-                  <td className="r num hide-m">{fmt(st.avgViews)}</td>
-                  <td className="r num" style={{fontWeight:600}}>{fmt(st.latest?.followers)}</td>
-                  <td className="r hide-m">{fmtDelta(st.d7)}</td>
-                </tr>)}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- Onglet Comptes ---------- */
-function Comptes({ withStats, models, vas, setDetail, reload, notify }) {
-  const [q, setQ] = useState("");
-  const [fModel, setFModel] = useState("");
-  const [fStatus, setFStatus] = useState("");
-  const [fVa, setFVa] = useState("");
-  const [showAdd, setShowAdd] = useState(false);
-
-  const list = withStats.filter(({a})=>{
-    if (q && !a.username.includes(q.toLowerCase().replace("@",""))) return false;
-    if (fModel==="none" && a.model_id) return false;
-    if (fModel && fModel!=="none" && a.model_id!==fModel) return false;
-    if (fStatus && a.status!==fStatus) return false;
-    if (fVa==="none" && a.va_name) return false;
-    if (fVa && fVa!=="none" && a.va_name!==fVa) return false;
-    return true;
-  });
-
-  async function setRating(a, rating) {
-    await db.from("accounts").update({ rating }).eq("id", a.id);
-    reload();
-  }
-  async function setModel(a, model_id) {
-    await db.from("accounts").update({ model_id: model_id || null }).eq("id", a.id);
-    reload();
-  }
-  async function setVaOn(a, va_name) {
-    await db.from("accounts").update({ va_name: va_name || null }).eq("id", a.id);
-    reload();
-  }
-
-  return (
-    <div>
-      <div className="row" style={{marginBottom:14}}>
-        <input placeholder="Rechercher un compte…" value={q} onChange={e=>setQ(e.target.value)} style={{maxWidth:230}}/>
-        <select value={fModel} onChange={e=>setFModel(e.target.value)} style={{maxWidth:180}}>
-          <option value="">Tous les modèles</option>
-          <option value="none">Sans modèle</option>
-          {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
-        <select value={fStatus} onChange={e=>setFStatus(e.target.value)} style={{maxWidth:160}}>
-          <option value="">Tous statuts</option>
-          {Object.entries(STATUS_LABEL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
-        </select>
-        <select value={fVa} onChange={e=>setFVa(e.target.value)} style={{maxWidth:160}}>
-          <option value="">Toutes les VA</option>
-          <option value="none">Sans VA</option>
-          {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
-        </select>
-        <div style={{flex:1}}/>
-        <button className="btn" onClick={()=>setShowAdd(!showAdd)}>{showAdd?"Fermer":"+ Ajouter un compte"}</button>
-      </div>
-
-      {showAdd &&
-        <div className="panel"><div style={{padding:18}}>
-          <AddAccountForm models={models} vas={vas} onDone={()=>{reload();}} notify={notify} />
-        </div></div>}
-
-      <div className="panel">
-        <div className="panel-head"><div className="bar"/><h2>COMPTES</h2><span className="hint">{list.length} affiché(s) — clic sur la ligne → détail</span></div>
-        <table>
-          <thead><tr>
-            <th>Compte</th><th>Modèle</th><th className="hide-m">VA</th><th>Statut</th>
-            <th className="r">Followers</th><th className="r hide-m">Followers Δ 7 j</th>
-            <th className="r">Vues 30 j</th><th className="hide-m">Note</th><th className="hide-m">Créé</th>
-          </tr></thead>
-          <tbody>
-            {list.map(({a,st})=>
-              <tr key={a.id} className="click" onClick={()=>setDetail({a,st})}>
-                <td>@{a.username}
-                  {a.device_ref && <div className="mut" style={{fontSize:11.5}}>{a.device_ref}{a.va_name?` · ${a.va_name}`:""}</div>}</td>
-                <td onClick={e=>e.stopPropagation()}>
-                  <select value={a.model_id||""} onChange={e=>setModel(a, e.target.value)} style={{padding:"5px 8px",fontSize:13,width:130}}>
-                    <option value="">— modèle —</option>
-                    {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select></td>
-                <td className="hide-m" onClick={e=>e.stopPropagation()}>
-                  <select value={a.va_name||""} onChange={e=>setVaOn(a, e.target.value)} style={{padding:"5px 8px",fontSize:13,width:120}}>
-                    <option value="">— VA —</option>
-                    {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
-                  </select></td>
-                <td><StatusBadge account={a}/></td>
-                <td className="r num">{fmt(st.latest?.followers)}</td>
-                <td className="r hide-m">{fmtDelta(st.d7)}</td>
-                <td className="r num">{fmt(st.latest?.views_30d)}</td>
-                <td className="hide-m"><Stars value={a.rating} onChange={r=>setRating(a,r)}/></td>
-                <td className="hide-m mut num">{fmtDate(a.started_on)} · {ageDays(a.started_on)} j</td>
-              </tr>)}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- Onglet Alertes ---------- */
-function Alertes({ alerts, setDetail }) {
-  const colors = { introuvable:"var(--orange)", banni:"var(--red)", eval:"var(--gold)", inactif:"var(--muted)" };
-  if (!alerts.length) return (
-    <div className="panel"><div style={{padding:26,textAlign:"center"}} className="mut">
-      Rien à signaler — tous les comptes tournent normalement ✓</div></div>
-  );
-  return (
-    <div className="panel">
-      <div className="panel-head"><div className="bar"/><h2>ALERTES</h2><span className="hint">{alerts.length}</span></div>
-      {alerts.map((al,i)=>
-        <div className="alert-line" key={i} style={{cursor:"pointer"}} onClick={()=>setDetail({a:al.a, st:null})}>
-          <div className="dot" style={{background:colors[al.type]}}/>
-          <div style={{fontWeight:600,minWidth:150}}>@{al.a.username}</div>
-          <div className="mut" style={{flex:1}}>{al.txt}</div>
-        </div>)}
-    </div>
-  );
-}
-
-/* ---------- Détail compte (modal) ---------- */
-function AccountDetail({ data, models, vas, snaps, close, reload, notify }) {
-  const a = data.a;
-  const st = data.st || computeAccountStats(a, snaps);
-  const [edit, setEdit] = useState({
-    model_id: a.model_id || "", device_ref: a.device_ref || "", va_name: a.va_name || "",
-    started_on: a.started_on, status: a.status, notes: a.notes || "",
-  });
-
-  async function save() {
-    const patch = { ...edit, model_id: edit.model_id || null };
-    if (patch.status !== a.status) patch.status_changed_on = todayStr();
-    const { error } = await db.from("accounts").update(patch).eq("id", a.id);
-    if (error) notify("Erreur : "+error.message);
-    else { notify("Enregistré ✓"); reload(); close(); }
-  }
-  async function archive() {
-    if (!confirm(`Archiver @${a.username} ? Il disparaît des listes (les données sont conservées).`)) return;
-    await db.from("accounts").update({ active:false, status:"supprime", status_changed_on: todayStr() }).eq("id", a.id);
-    notify("Compte archivé"); reload(); close();
-  }
-
-  return (
-    <div className="overlay" onClick={close}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
-        <div className="row" style={{marginBottom:14}}>
-          <h2 style={{fontSize:18,flex:1}}>@{a.username}</h2>
-          <a className="btn ghost sm" href={"https://instagram.com/"+a.username} target="_blank" rel="noreferrer">Ouvrir Insta</a>
-          <button className="btn ghost sm" onClick={close}>✕</button>
-        </div>
-
-        <div className="row" style={{gap:22,marginBottom:14}} >
-          <div><span className="mut" style={{fontSize:12.5}}>Followers</span><div className="num" style={{fontSize:20,fontWeight:700}}>{fmt(st.latest?.followers)}</div></div>
-          <div><span className="mut" style={{fontSize:12.5}}>Followers Δ 7 j</span><div style={{fontSize:20,fontWeight:700}}>{fmtDelta(st.d7)}</div></div>
-          <div><span className="mut" style={{fontSize:12.5}}>Vues 30 j</span><div className="num" style={{fontSize:20,fontWeight:700}}>{fmt(st.latest?.views_30d)}</div></div>
-          <div><span className="mut" style={{fontSize:12.5}}>Moy./reel</span><div className="num" style={{fontSize:20,fontWeight:700}}>{fmt(st.avgViews)}</div></div>
-          <div><span className="mut" style={{fontSize:12.5}}>Âge</span><div className="num" style={{fontSize:20,fontWeight:700}}>{ageDays(a.started_on)} j</div></div>
-        </div>
-
-        <div className="panel" style={{marginBottom:16}}>
-          <div className="panel-head"><div className="bar"/><h2>PAR PÉRIODE</h2></div>
-          <table>
-            <thead><tr>
-              <th>Période</th><th className="r">Reels</th><th className="r">Vues</th>
-              <th className="r">Moy./reel</th><th className="r">Likes</th>
-              <th className="r">Commentaires</th><th className="r hide-m">Engagement</th>
-            </tr></thead>
-            <tbody>
-              {PERIODS.map(pd=>{
-                const m = st.per ? st.per(pd.key) : null;
-                return (
-                  <tr key={pd.key}>
-                    <td style={{fontWeight:600}}>{pd.label}</td>
-                    <td className="r num">{m?.reels ?? "—"}</td>
-                    <td className="r num" style={{fontWeight:600}}>{fmt(m?.views)}</td>
-                    <td className="r num">{fmt(m?.avg)}</td>
-                    <td className="r num">{fmt(m?.likes)}</td>
-                    <td className="r num" style={{fontWeight:600}}>{fmt(m?.comments)}</td>
-                    <td className="r num hide-m">{m?.eng!=null ? m.eng.toFixed(1).replace(".",",")+" %" : "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="panel" style={{marginBottom:16}}><div style={{padding:"12px 14px"}}>
-          <Sparkline series={st.series||[]} /></div></div>
-
-        <div className="grid2">
-          <div className="field"><label>Modèle</label>
-            <select value={edit.model_id} onChange={e=>setEdit({...edit,model_id:e.target.value})}>
-              <option value="">— modèle —</option>
-              {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-            </select></div>
-          <div className="field"><label>Statut</label>
-            <select value={edit.status} onChange={e=>setEdit({...edit,status:e.target.value})}>
-              {Object.entries(STATUS_LABEL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
-            </select></div>
-          <div className="field"><label>Device</label>
-            <input value={edit.device_ref} onChange={e=>setEdit({...edit,device_ref:e.target.value})}/></div>
-          <div className="field"><label>VA</label>
-            <select value={edit.va_name} onChange={e=>setEdit({...edit,va_name:e.target.value})}>
-              <option value="">— VA —</option>
-              {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
-            </select></div>
-          <div className="field"><label>Créé le</label>
-            <input type="date" value={edit.started_on} onChange={e=>setEdit({...edit,started_on:e.target.value})}/></div>
-          <div className="field"><label>Notes</label>
-            <input value={edit.notes} onChange={e=>setEdit({...edit,notes:e.target.value})}/></div>
-        </div>
-
-        <div className="row" style={{marginTop:16}}>
-          <button className="btn" onClick={save}>Enregistrer</button>
-          <div style={{flex:1}}/>
-          <button className="btn danger sm" onClick={archive}>Archiver le compte</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- Onglet Réglages ---------- */
-function Reglages({ settings, models, accounts, vas, reload, notify }) {
-  const [adminPin, setAdminPin] = useState(String(settings.admin_pin||""));
-  const [vaPin, setVaPin] = useState(String(settings.va_pin||""));
-  const [seuil, setSeuil] = useState(String(settings.seuil_vues||500));
-  const [newModel, setNewModel] = useState("");
-  const [newVa, setNewVa] = useState("");
-  const [scanBusy, setScanBusy] = useState(false);
-  const [log, setLog] = useState([]);
-
-  useEffect(()=>{
-    db.from("scan_log").select("*").order("ran_at",{ascending:false}).limit(5)
-      .then(({data})=>setLog(data||[]));
-  },[]);
-
-  async function saveSettings() {
-    const { error } = await db.from("app_settings")
-      .update({ data: { ...settings, admin_pin: adminPin, va_pin: vaPin, seuil_vues: Number(seuil)||500 } })
-      .eq("id",1);
-    if (error) notify("Erreur : "+error.message); else { notify("Réglages enregistrés ✓"); reload(); }
-  }
-
-  async function addModel() {
-    const name = newModel.trim();
-    if (!name) return;
-    const { error } = await db.from("models").insert({ name });
-    if (error) notify("Erreur : "+error.message); else { setNewModel(""); notify("Modèle ajouté ✓"); reload(); }
-  }
-  async function toggleModel(m) {
-    await db.from("models").update({ active: !m.active }).eq("id", m.id);
-    reload();
-  }
-  async function addVa() {
-    const name = newVa.trim();
-    if (!name) return;
-    const { error } = await db.from("vas").insert({ name });
-    if (error) notify(error.code==="23505" ? "Cette VA existe déjà" : "Erreur : "+error.message);
-    else { setNewVa(""); notify("VA ajoutée ✓"); reload(); }
-  }
-  async function toggleVa(v) {
-    await db.from("vas").update({ active: !v.active }).eq("id", v.id);
-    reload();
-  }
-  async function renameVa(v) {
-    const name = prompt("Nouveau nom :", v.name);
-    if (!name || !name.trim()) return;
-    await db.from("vas").update({ name: name.trim() }).eq("id", v.id);
-    await db.from("accounts").update({ va_name: name.trim() }).eq("va_name", v.name);
-    notify("Renommée ✓"); reload();
-  }
-
-  async function renameModel(m) {
-    const name = prompt("Nouveau nom :", m.name);
-    if (!name || !name.trim()) return;
-    await db.from("models").update({ name: name.trim() }).eq("id", m.id);
-    reload();
-  }
-
-  async function scanNow() {
-    setScanBusy(true);
-    try {
-      const res = await fetch("/.netlify/functions/scrape-now", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ pin: adminPin }),
-      });
-      const j = await res.json();
-      notify(j.ok ? j.message : ("Refusé : " + (j.error||""))); 
-    } catch { notify("Erreur réseau — le site est bien déployé sur Netlify ?"); }
-    setScanBusy(false);
-  }
-
-  return (
-    <div>
-      <div className="panel">
-        <div className="panel-head"><div className="bar"/><h2>SCAN</h2></div>
-        <div style={{padding:18}}>
-          <div className="row">
-            <button className="btn" disabled={scanBusy} onClick={scanNow}>{scanBusy?"…":"Scanner maintenant"}</button>
-            <span className="mut">Le scan automatique tourne chaque nuit à 04:00 (Bangkok). Recharge la page 2-3 min après un scan manuel.</span>
-          </div>
-          {log.length>0 && <div style={{marginTop:14}}>
-            <div className="mut" style={{fontSize:12.5,marginBottom:6}}>Derniers scans</div>
-            {log.map(l=><div key={l.id} className="mut num" style={{fontSize:13}}>
-              {new Date(l.ran_at).toLocaleString("fr-FR",{timeZone:"Asia/Bangkok"})} — {l.accounts_scanned} comptes, {l.errors} erreur(s)</div>)}
-          </div>}
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-head"><div className="bar"/><h2>MODÈLES</h2></div>
-        <div style={{padding:18}}>
-          <div className="row" style={{marginBottom:12}}>
-            <input placeholder="Nom de la modèle" value={newModel} onChange={e=>setNewModel(e.target.value)} style={{maxWidth:240}}/>
-            <button className="btn" onClick={addModel}>Ajouter</button>
-          </div>
-          {models.map(m=>
-            <div className="row" key={m.id} style={{padding:"7px 0",borderBottom:"1px solid var(--border)"}}>
-              <div style={{flex:1,opacity:m.active?1:.45}}>{m.name}
-                <span className="mut" style={{fontSize:12,marginLeft:8}}>
-                  {accounts.filter(a=>a.model_id===m.id && a.active).length} compte(s)</span></div>
-              <button className="btn ghost sm" onClick={()=>renameModel(m)}>Renommer</button>
-              <button className="btn ghost sm" onClick={()=>toggleModel(m)}>{m.active?"Désactiver":"Réactiver"}</button>
-            </div>)}
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-head"><div className="bar"/><h2>VA (ASSISTANTES)</h2>
-          <span className="hint">chacune choisit son nom à la connexion</span></div>
-        <div style={{padding:18}}>
-          <div className="row" style={{marginBottom:12}}>
-            <input placeholder="Prénom de la VA" value={newVa} onChange={e=>setNewVa(e.target.value)} style={{maxWidth:240}}/>
-            <button className="btn" onClick={addVa}>Ajouter</button>
-          </div>
-          {(vas||[]).length === 0 &&
-            <div className="mut" style={{fontSize:13}}>Aucune VA enregistrée pour l'instant.</div>}
-          {(vas||[]).map(v=>
-            <div className="row" key={v.id} style={{padding:"7px 0",borderBottom:"1px solid var(--border)"}}>
-              <div style={{flex:1,opacity:v.active?1:.45}}>{v.name}
-                <span className="mut" style={{fontSize:12,marginLeft:8}}>
-                  {accounts.filter(a=>a.va_name===v.name && a.active).length} compte(s)</span></div>
-              <button className="btn ghost sm" onClick={()=>renameVa(v)}>Renommer</button>
-              <button className="btn ghost sm" onClick={()=>toggleVa(v)}>{v.active?"Désactiver":"Réactiver"}</button>
-            </div>)}
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-head"><div className="bar"/><h2>ACCÈS & SEUILS</h2></div>
-        <div style={{padding:18}}>
-          <div className="grid2">
-            <div className="field"><label>PIN admin (toi)</label>
-              <input value={adminPin} onChange={e=>setAdminPin(e.target.value)}/></div>
-            <div className="field"><label>PIN VA</label>
-              <input value={vaPin} onChange={e=>setVaPin(e.target.value)}/></div>
-            <div className="field"><label>Seuil "compte mort" (vues moyennes par reel)</label>
-              <input type="number" value={seuil} onChange={e=>setSeuil(e.target.value)}/></div>
-          </div>
-          <button className="btn" style={{marginTop:14}} onClick={saveSettings}>Enregistrer</button>
-        </div>
-      </div>
     </div>
   );
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+
 </script>
 </body>
 </html>
