@@ -1,0 +1,1724 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sensual Aura — Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+  :root{
+    --n0:#0B0710; --n1:#140E1C; --n2:#1C1428; --n3:#261B35;
+    --line:#2E2240; --line-soft:#241A33;
+    --txt:#F0EAF7; --mut:#9B8FB0; --mut-2:#6F6383;
+    --violet:#A855F7; --violet-deep:#833AB4;
+    --magenta:#E1306C; --amber:#F9A03F;
+    --mint:#3DDC97; --coral:#FF6B6B;
+    --grad: linear-gradient(103deg,#833AB4 0%,#C13584 38%,#E1306C 62%,#F9A03F 100%);
+    --ring: 0 0 0 3px rgba(168,85,247,.32);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:
+      radial-gradient(1100px 620px at 8% -8%, rgba(131,58,180,.16), transparent 60%),
+      radial-gradient(900px 520px at 96% 4%, rgba(225,48,108,.10), transparent 62%),
+      var(--n0);
+    background-attachment:fixed;
+    color:var(--txt);
+    font-family:Inter,system-ui,-apple-system,sans-serif;
+    font-size:15px; line-height:1.5;
+    min-height:100vh;
+  }
+  input,select,textarea,button{font-family:inherit;font-size:inherit;color:inherit}
+  input,select,textarea{
+    background:var(--n2); border:1px solid var(--line); border-radius:11px;
+    padding:10px 13px; outline:none; width:100%; transition:border-color .16s, box-shadow .16s;
+  }
+  input:focus,select:focus,textarea:focus{border-color:var(--violet); box-shadow:var(--ring)}
+  button{cursor:pointer;border:none;background:none;transition:transform .09s cubic-bezier(.34,1.56,.64,1), filter .16s, background .16s}
+  button:active{transform:scale(.955)}
+  button:focus-visible{outline:none; box-shadow:var(--ring)}
+  a{color:var(--magenta);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* chiffres : jamais coupés, toujours alignés */
+  .num{font-variant-numeric:tabular-nums; white-space:nowrap}
+  .val{font-family:'Bricolage Grotesque',Inter,sans-serif; font-variant-numeric:tabular-nums; white-space:nowrap; letter-spacing:-.02em}
+  .unit{font-size:.58em; font-weight:700; margin-left:.1em; vertical-align:.14em; color:var(--mut); letter-spacing:0}
+
+  .grad-txt{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* barre du haut */
+  .bar{
+    position:sticky; top:0; z-index:40;
+    display:flex; align-items:center; gap:18px;
+    padding:12px 20px;
+    background:rgba(11,7,16,.82); backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line-soft);
+  }
+  .logo{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+  .logo .dot{width:11px;height:11px;border-radius:4px;background:var(--grad)}
+  .nav{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none}
+  .nav::-webkit-scrollbar{display:none}
+  .nav button{
+    padding:8px 14px;border-radius:10px;color:var(--mut);font-weight:500;white-space:nowrap;
+  }
+  .nav button:hover{color:var(--txt);background:var(--n2)}
+  .nav button[data-on="1"]{color:var(--txt);background:var(--n3)}
+  .nav button[data-on="1"]::after{
+    content:"";display:block;height:2px;border-radius:2px;background:var(--grad);
+    margin-top:5px;margin-bottom:-7px;
+  }
+
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 18px 70px}
+
+  /* héros */
+  .hero{
+    border:1px solid var(--line); border-radius:22px; overflow:hidden;
+    background:linear-gradient(168deg,var(--n2),var(--n1) 62%);
+    margin-bottom:16px;
+  }
+  .hero-in{padding:26px 26px 22px;display:flex;gap:30px;flex-wrap:wrap;align-items:flex-end}
+  .hero-main{flex:1;min-width:250px}
+  .hero-label{color:var(--mut);font-size:13px;font-weight:500;margin-bottom:2px}
+  .hero-num{font-size:clamp(46px,9vw,78px);font-weight:800;line-height:1}
+  .hero-sub{margin-top:9px;display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:13.5px}
+
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 11px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap;
+  }
+  .pill.up{background:rgba(61,220,151,.13);color:var(--mint)}
+  .pill.down{background:rgba(255,107,107,.13);color:var(--coral)}
+  .pill.flat{background:var(--n3);color:var(--mut)}
+
+  /* palier */
+  .tier{min-width:250px;flex:1}
+  .tier-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+  .tier-name{font-weight:700;font-size:14.5px}
+  .tier-goal{color:var(--mut);font-size:12.5px;white-space:nowrap}
+  .track{height:9px;border-radius:999px;background:var(--n3);overflow:hidden}
+  .fill{height:100%;border-radius:999px;background:var(--grad);transition:width .9s cubic-bezier(.22,1,.36,1)}
+  .tier-msg{margin-top:9px;font-size:13px;color:var(--mut)}
+  .tier-msg strong{color:var(--txt)}
+
+  /* trio de périodes */
+  .trio{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 26px 24px}
+  .cell{background:var(--n2);border:1px solid var(--line-soft);border-radius:15px;padding:15px 16px}
+  .cell-l{color:var(--mut);font-size:12px;font-weight:500;margin-bottom:5px}
+  .cell-v{font-size:25px;font-weight:700}
+  .cell-d{margin-top:7px;font-size:12.5px}
+
+  /* panneaux */
+  .panel{background:var(--n1);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-bottom:16px}
+  .ph{display:flex;align-items:center;gap:11px;padding:15px 20px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+  .ph h2{font-size:15px;font-weight:700;letter-spacing:-.01em;flex:1;white-space:nowrap}
+  .ph .hint{color:var(--mut-2);font-size:12.5px}
+
+  .scroll{overflow-x:auto;scrollbar-width:thin}
+  table{width:100%;border-collapse:collapse;min-width:640px}
+  th{
+    text-align:left;font-size:11.5px;font-weight:600;color:var(--mut-2);
+    padding:11px 14px;border-bottom:1px solid var(--line-soft);white-space:nowrap;
+  }
+  th.r,td.r{text-align:right}
+  td{padding:13px 14px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  tr.tap{cursor:pointer;transition:background .13s}
+  tr.tap:hover td{background:var(--n2)}
+  .who{font-weight:600}
+  .sub{color:var(--mut-2);font-size:12px;font-weight:400;margin-top:2px}
+
+  .chip{display:inline-block;padding:3px 10px;border-radius:8px;font-size:12px;font-weight:600;white-space:nowrap}
+  .c-actif{background:rgba(61,220,151,.13);color:var(--mint)}
+  .c-banni{background:rgba(255,107,107,.14);color:var(--coral)}
+  .c-introuvable{background:rgba(249,160,63,.15);color:var(--amber)}
+  .c-restreint{background:rgba(249,160,63,.16);color:var(--amber)}
+  .c-supprime{background:var(--n3);color:var(--mut-2)}
+
+  .btn{
+    background:var(--grad);color:#fff;font-weight:600;padding:10px 17px;border-radius:11px;
+    box-shadow:0 5px 18px rgba(193,53,132,.28); white-space:nowrap;
+  }
+  .btn:hover{filter:brightness(1.09)}
+  .btn:active{box-shadow:0 2px 8px rgba(193,53,132,.26)}
+  .btn.q{background:var(--n2);color:var(--txt);border:1px solid var(--line);box-shadow:none}
+  .btn.q:hover{background:var(--n3)}
+  .btn.d{background:rgba(255,107,107,.14);color:var(--coral);box-shadow:none}
+  .btn.s{padding:6px 12px;font-size:13px;border-radius:9px}
+
+  .seg{display:inline-flex;background:var(--n2);border:1px solid var(--line);border-radius:12px;padding:3px;gap:2px}
+  .seg button{padding:6px 13px;border-radius:9px;font-size:13px;font-weight:600;color:var(--mut)}
+  .seg button:hover{color:var(--txt)}
+  .seg button[data-on="1"]{background:var(--n3);color:var(--txt);box-shadow:inset 0 0 0 1px var(--line)}
+
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .fld label{display:block;font-size:12.5px;color:var(--mut);margin-bottom:5px}
+  .pad{padding:20px}
+
+  .stars button{color:#3A2E4A;font-size:17px;padding:0 1px;line-height:1}
+  .stars button[data-on="1"]{color:var(--amber)}
+
+  .ov{position:fixed;inset:0;background:rgba(5,3,8,.7);backdrop-filter:blur(3px);display:flex;align-items:flex-start;justify-content:center;padding:36px 14px;z-index:60;overflow-y:auto}
+  .modal{background:var(--n1);border:1px solid var(--line);border-radius:20px;width:100%;max-width:680px;padding:22px}
+
+  .gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .gate-box{width:100%;max-width:330px;text-align:center}
+  .gate-box h1{font-family:'Bricolage Grotesque',sans-serif;font-size:27px;font-weight:800;letter-spacing:-.02em;margin-bottom:5px}
+  .gate-box p{color:var(--mut);margin-bottom:22px;font-size:14px}
+  .gate-box input{text-align:center;font-size:23px;letter-spacing:9px;padding:13px}
+
+  .alert{display:flex;gap:13px;align-items:flex-start;padding:14px 20px;border-bottom:1px solid var(--line-soft)}
+  .alert:last-child{border-bottom:none}
+  .bead{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:7px}
+
+  .toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+    background:var(--n3);border:1px solid var(--line);padding:12px 20px;border-radius:13px;
+    z-index:90;box-shadow:0 10px 34px rgba(0,0,0,.45);font-size:14px;max-width:90vw;
+  }
+  .empty{padding:34px 20px;text-align:center;color:var(--mut-2);font-size:14px}
+
+  @media (max-width:720px){
+    .wrap{padding:16px 12px 60px}
+    .hero-in{padding:20px 18px 16px;gap:20px}
+    .trio{grid-template-columns:1fr;padding:0 18px 18px}
+    .g2{grid-template-columns:1fr}
+    .modal{padding:18px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important}
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef } = React;
+let db = null;
+
+/* ---------- dates & format ---------- */
+const todayStr = () => new Date().toISOString().slice(0,10);
+const daysAgoStr = (n) => new Date(Date.now() - n*86400000).toISOString().slice(0,10);
+const ageDays = (d) => Math.floor((Date.now() - new Date(d+"T00:00:00").getTime())/86400000);
+const cleanUsername = (u) => u.trim().replace(/^@/,"").replace(/\s+/g,"").toLowerCase();
+const fmtDate = (d) => { if(!d) return "—"; const [y,m,dd]=d.split("-"); return `${dd}/${m}`; };
+
+// Découpe un nombre en valeur + unité pour que le "k" ne parte jamais à la ligne
+function split(n){
+  if (n === null || n === undefined) return null;
+  const a = Math.abs(n);
+  const dec = (x,d) => x.toFixed(d).replace(".",",");
+  if (a >= 1e6){
+    const m = n/1e6;
+    return { v:dec(m, Math.abs(m)>=10 ? 0 : 1), u:"M" };
+  }
+  if (a >= 1e4){
+    const k = n/1e3;
+    // 999 999 arrondirait à "1000 k" : on bascule en millions
+    if (Math.abs(Number(k.toFixed(1))) >= 1000) return { v:dec(n/1e6,1), u:"M" };
+    return { v:dec(k,1), u:"k" };
+  }
+  if (a >= 1000) return { v:n.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g," "), u:"" };
+  return { v:String(n), u:"" };
+}
+function Num({ n, className="", style }){
+  const s = split(n);
+  if (!s) return <span className={"num "+className} style={{color:"var(--mut-2)",...style}}>—</span>;
+  return <span className={"val "+className} style={style}>{s.v}{s.u && <span className="unit">{s.u}</span>}</span>;
+}
+const fmtTxt = (n) => { const s = split(n); return s ? s.v + (s.u ? " " + s.u : "") : "—"; };
+// Objectifs de palier : ronds par nature, on retire la décimale (500 k, pas 500,0 k)
+const fmtGoal = (n) => { const s = split(n); if(!s) return "—";
+  return s.v.replace(/,0$/,"") + (s.u ? " " + s.u : ""); };
+// Accord singulier / pluriel
+const plural = (n, one, many) => `${n} ${n>1?many:one}`;
+
+function Delta({ n, suffix }){
+  if (n === null || n === undefined) return <span className="pill flat">—</span>;
+  if (n > 0) return <span className="pill up">▲ {fmtTxt(n)}{suffix||""}</span>;
+  if (n < 0) return <span className="pill down">▼ {fmtTxt(Math.abs(n))}{suffix||""}</span>;
+  return <span className="pill flat">stable</span>;
+}
+
+const PERIODS = [
+  { key:"7d", label:"7 jours", days:7 },
+  { key:"15d", label:"15 jours", days:15 },
+  { key:"30d", label:"30 jours", days:30 },
+  { key:"total", label:"Total", days:null },
+];
+const STATUS = { actif:"Actif", restreint:"Restreint", introuvable:"Introuvable", banni:"Banni", supprime:"Supprimé" };
+
+/* ---------- paliers de vues (30 jours) ---------- */
+const TIERS = [
+  { at:0,        name:"Premiers pas",   msg:"Les premiers reels sont en ligne. On regarde ce qui accroche." },
+  { at:10000,    name:"Ça décolle",     msg:"10 k dépassés. Le format commence à trouver son public." },
+  { at:50000,    name:"Ça tourne",      msg:"50 k sur 30 jours. Les comptes tiennent la route." },
+  { at:100000,   name:"Six chiffres",   msg:"100 k franchis. Beau travail — c'est le seuil où le trafic devient sérieux." },
+  { at:500000,   name:"Demi-million",   msg:"500 k sur 30 jours. La machine est lancée." },
+  { at:1000000,  name:"Le million",     msg:"1 million de vues sur 30 jours. Rare. Profite." },
+  { at:5000000,  name:"Cinq millions",  msg:"5 M sur 30 jours. À ce stade, c'est une audience, plus un test." },
+  { at:20000000, name:"Hors norme",     msg:"20 M. Il n'y a plus de palier au-dessus." },
+];
+function tierOf(v){
+  const n = v || 0;
+  let cur = TIERS[0], next = TIERS[1];
+  for (let i=0;i<TIERS.length;i++){
+    if (n >= TIERS[i].at){ cur = TIERS[i]; next = TIERS[i+1] || null; }
+  }
+  const from = cur.at, to = next ? next.at : cur.at;
+  const pct = next ? Math.max(0, Math.min(100, ((n-from)/(to-from))*100)) : 100;
+  return { cur, next, pct };
+}
+
+/* ---------- calculs par compte ---------- */
+function stats(account, snaps){
+  const s = snaps.filter(x=>x.account_id===account.id).sort((a,b)=>a.taken_on<b.taken_on?-1:1);
+  const latest = s[s.length-1] || null;
+  const tracked = s.length>1
+    ? Math.round((new Date(s[s.length-1].taken_on) - new Date(s[0].taken_on))/86400000) : 0;
+  const at = (n) => {
+    if (tracked < n) return null;
+    const t = daysAgoStr(n); let best=null;
+    for (const x of s) if (x.taken_on <= t) best = x;
+    return best;
+  };
+  const dFol = (n) => {
+    const r = at(n);
+    if (!latest || !r || r===latest || latest.followers==null || r.followers==null) return null;
+    return latest.followers - r.followers;
+  };
+  const per = (p) => {
+    if (!latest) return { views:null, reels:null, likes:null, comments:null, avg:null, eng:null };
+    const views=latest[`views_${p}`] ?? null, reels=latest[`reels_${p}`] ?? null;
+    const likes=latest[`likes_${p}`] ?? null, comments=latest[`comments_${p}`] ?? null;
+    return {
+      views, reels, likes, comments,
+      avg: (views!=null && reels>0) ? Math.round(views/reels) : null,
+      eng: (latest.followers>0 && reels>0 && (likes||comments))
+        ? (((likes+comments)/reels)/latest.followers)*100 : null,
+    };
+  };
+  const dViews = (p) => {
+    const nd = p==="7d"?7 : p==="15d"?15 : p==="30d"?30 : null;
+    if (nd===null || !latest || tracked < nd) return null;
+    const r = at(nd);
+    if (!r || r===latest) return null;
+    const a=latest[`views_${p}`], b=r[`views_${p}`];
+    return (a==null||b==null) ? null : a-b;
+  };
+  return { latest, tracked, d7:dFol(7), d30:dFol(30), per, dViews, series:s };
+}
+// Couleur par destination, pour les repérer d'un coup d'œil
+const DEST_COLOR = { telegram:"#2AABEE", mym:"#E1306C", onlyfans:"#00AFF0",
+  instagram:"#F9A03F", snapchat:"#FFFC00", tiktok:"#A855F7", whatsapp:"#25D366", autre:"#6F6383" };
+const destColor = (k) => DEST_COLOR[k] || DEST_COLOR.autre;
+
+// Noms de pays, codes ISO à deux lettres
+const PAYS = {AD:"Andorre",AE:"Émirats arabes unis",AF:"Afghanistan",AG:"Antigua-et-Barbuda",AI:"Anguilla",AL:"Albanie",AM:"Arménie",AO:"Angola",AQ:"Antarctique",AR:"Argentine",AS:"Samoa américaines",AT:"Autriche",AU:"Australie",AW:"Aruba",AZ:"Azerbaïdjan",BA:"Bosnie-Herzégovine",BB:"Barbade",BD:"Bangladesh",BE:"Belgique",BF:"Burkina Faso",BG:"Bulgarie",BH:"Bahreïn",BI:"Burundi",BJ:"Bénin",BL:"Saint-Barthélemy",BM:"Bermudes",BN:"Brunei",BO:"Bolivie",BR:"Brésil",BS:"Bahamas",BT:"Bhoutan",BW:"Botswana",BY:"Biélorussie",BZ:"Belize",CA:"Canada",CD:"Congo (RDC)",CF:"Centrafrique",CG:"Congo",CH:"Suisse",CI:"Côte d'Ivoire",CK:"Îles Cook",CL:"Chili",CM:"Cameroun",CN:"Chine",CO:"Colombie",CR:"Costa Rica",CU:"Cuba",CV:"Cap-Vert",CW:"Curaçao",CY:"Chypre",CZ:"Tchéquie",DE:"Allemagne",DJ:"Djibouti",DK:"Danemark",DM:"Dominique",DZ:"Algérie",EC:"Équateur",EE:"Estonie",EG:"Égypte",ER:"Érythrée",ES:"Espagne",ET:"Éthiopie",FI:"Finlande",FJ:"Fidji",FK:"Îles Malouines",FM:"Micronésie",FO:"Îles Féroé",FR:"France",GA:"Gabon",GB:"Royaume-Uni",GD:"Grenade",GE:"Géorgie",GF:"Guyane française",GG:"Guernesey",GH:"Ghana",GI:"Gibraltar",GL:"Groenland",GM:"Gambie",GN:"Guinée",GP:"Guadeloupe",GQ:"Guinée équatoriale",GR:"Grèce",GS:"Géorgie du Sud",GT:"Guatemala",GU:"Guam",GW:"Guinée-Bissau",GY:"Guyana",HK:"Hong Kong",HN:"Honduras",HR:"Croatie",HT:"Haïti",HU:"Hongrie",ID:"Indonésie",IE:"Irlande",IL:"Israël",IM:"Île de Man",IN:"Inde",IQ:"Irak",IR:"Iran",IS:"Islande",IT:"Italie",JE:"Jersey",JM:"Jamaïque",JO:"Jordanie",JP:"Japon",KE:"Kenya",KG:"Kirghizistan",KH:"Cambodge",KI:"Kiribati",KM:"Comores",KN:"Saint-Christophe-et-Niévès",KP:"Corée du Nord",KR:"Corée du Sud",KW:"Koweït",KY:"Îles Caïmans",KZ:"Kazakhstan",LA:"Laos",LB:"Liban",LC:"Sainte-Lucie",LI:"Liechtenstein",LK:"Sri Lanka",LR:"Liberia",LS:"Lesotho",LT:"Lituanie",LU:"Luxembourg",LV:"Lettonie",LY:"Libye",MA:"Maroc",MC:"Monaco",MD:"Moldavie",ME:"Monténégro",MF:"Saint-Martin",MG:"Madagascar",MH:"Îles Marshall",MK:"Macédoine du Nord",ML:"Mali",MM:"Birmanie",MN:"Mongolie",MO:"Macao",MP:"Îles Mariannes du Nord",MQ:"Martinique",MR:"Mauritanie",MS:"Montserrat",MT:"Malte",MU:"Maurice",MV:"Maldives",MW:"Malawi",MX:"Mexique",MY:"Malaisie",MZ:"Mozambique",NA:"Namibie",NC:"Nouvelle-Calédonie",NE:"Niger",NG:"Nigeria",NI:"Nicaragua",NL:"Pays-Bas",NO:"Norvège",NP:"Népal",NR:"Nauru",NU:"Niue",NZ:"Nouvelle-Zélande",OM:"Oman",PA:"Panama",PE:"Pérou",PF:"Polynésie française",PG:"Papouasie-Nouvelle-Guinée",PH:"Philippines",PK:"Pakistan",PL:"Pologne",PM:"Saint-Pierre-et-Miquelon",PR:"Porto Rico",PS:"Palestine",PT:"Portugal",PW:"Palaos",PY:"Paraguay",QA:"Qatar",RE:"La Réunion",RO:"Roumanie",RS:"Serbie",RU:"Russie",RW:"Rwanda",SA:"Arabie saoudite",SB:"Îles Salomon",SC:"Seychelles",SD:"Soudan",SE:"Suède",SG:"Singapour",SI:"Slovénie",SK:"Slovaquie",SL:"Sierra Leone",SM:"Saint-Marin",SN:"Sénégal",SO:"Somalie",SR:"Suriname",SS:"Soudan du Sud",ST:"Sao Tomé-et-Principe",SV:"Salvador",SY:"Syrie",SZ:"Eswatini",TC:"Îles Turques-et-Caïques",TD:"Tchad",TG:"Togo",TH:"Thaïlande",TJ:"Tadjikistan",TL:"Timor oriental",TM:"Turkménistan",TN:"Tunisie",TO:"Tonga",TR:"Turquie",TT:"Trinité-et-Tobago",TV:"Tuvalu",TW:"Taïwan",TZ:"Tanzanie",UA:"Ukraine",UG:"Ouganda",US:"États-Unis",UY:"Uruguay",UZ:"Ouzbékistan",VA:"Vatican",VC:"Saint-Vincent-et-les-Grenadines",VE:"Venezuela",VG:"Îles Vierges britanniques",VI:"Îles Vierges américaines",VN:"Vietnam",VU:"Vanuatu",WF:"Wallis-et-Futuna",WS:"Samoa",YE:"Yémen",YT:"Mayotte",ZA:"Afrique du Sud",ZM:"Zambie",ZW:"Zimbabwe"};
+const paysNom = (c) => PAYS[c] || (c==="XX" ? "Origine inconnue" : c);
+
+// Dernier relevé connu d'un lien
+function lastLinkStat(linkId, linkStats){
+  const s = linkStats.filter(x=>x.link_id===linkId).sort((a,b)=>a.taken_on<b.taken_on?-1:1);
+  return s[s.length-1] || null;
+}
+// Clics cumulés d'un ensemble de liens
+function clicksOf(links, linkStats, period){
+  const suffix = period==="7d" ? "7d" : "30d";
+  let v=0,u=0,c=0,has=false;
+  for(const l of links){
+    const st = lastLinkStat(l.link_id, linkStats);
+    if(!st) continue;
+    if(st[`visits_${suffix}`]!=null){ v+=st[`visits_${suffix}`]; has=true; }
+    if(st[`uniques_${suffix}`]!=null){ u+=st[`uniques_${suffix}`]; has=true; }
+    if(st[`clicks_${suffix}`]!=null){ c+=st[`clicks_${suffix}`]; has=true; }
+  }
+  return has ? { visits:v, uniques:u, clicks:c } : { visits:null, uniques:null, clicks:null };
+}
+const sumOf = (rows, f) => { let t=0,h=false; for(const r of rows){ const v=f(r); if(v!=null){t+=v;h=true;} } return h?t:null; };
+
+/* ---------- petits composants ---------- */
+function Seg({ value, onChange, options }){
+  return (
+    <div className="seg">
+      {options.map(o=>
+        <button key={o.key} data-on={value===o.key?"1":"0"} onClick={()=>onChange(o.key)}>{o.label}</button>)}
+    </div>
+  );
+}
+function Status({ a }){
+  return (
+    <span>
+      <span className={"chip c-"+a.status}>{STATUS[a.status]||a.status}</span>
+      {a.status!=="actif" && a.status_changed_on &&
+        <span style={{color:"var(--mut-2)",fontSize:11.5,marginLeft:6}}>{fmtDate(a.status_changed_on)}</span>}
+    </span>
+  );
+}
+function Stars({ value, onChange }){
+  return <span className="stars">{[1,2,3,4,5].map(i=>
+    <button key={i} data-on={i<=value?"1":"0"}
+      onClick={(e)=>{e.stopPropagation(); onChange && onChange(i===value?0:i);}}>★</button>)}</span>;
+}
+// Graphe jour par jour : ce qui a été gagné entre deux relevés.
+// Survol de la souris ou du doigt → le détail du jour.
+function Journal({ series }){
+  const [mode,setMode] = useState("views");
+  const [hover,setHover] = useState(null);
+
+  // un point par jour, à partir du deuxième relevé
+  const days = useMemo(()=>{
+    const s = (series||[]).slice().sort((a,b)=>a.taken_on<b.taken_on?-1:1);
+    const out = [];
+    for (let i=1;i<s.length;i++){
+      const a=s[i-1], b=s[i];
+      // Une différence n'a de sens qu'entre DEUX valeurs du MÊME champ.
+      // Sans repli d'un champ sur un autre : ça produirait des chiffres absurdes.
+      const diff=(f)=>{ const x=b[f], y=a[f]; return (x==null||y==null) ? null : x-y; };
+      const views = diff("views_total");
+      const followers = diff("followers");
+      const reels = diff("reels_total");
+      // on n'affiche un jour que s'il a au moins une donnée exploitable
+      if (views===null && followers===null) continue;
+      out.push({ date: b.taken_on, views, followers, reels, totalFollowers: b.followers ?? null });
+    }
+    return out;
+  },[series]);
+
+  const MODES=[{key:"views",label:"Vues gagnées"},{key:"followers",label:"Abonnés gagnés"}];
+  const label = (MODES.find(m=>m.key===mode)||{}).label;
+
+  if (days.length===0) return (
+    <div>
+      <div className="empty" style={{padding:"26px 18px"}}>
+        Le jour par jour démarre au deuxième relevé. Reviens demain : tu verras
+        ce que chaque journée a rapporté, jour après jour.
+      </div>
+    </div>
+  );
+
+  const vals = days.map(d=>d[mode]).map(v=>v==null?0:v);
+  const max = Math.max(1, ...vals.map(v=>Math.abs(v)));
+  const W=680, H=170, padL=8, padR=8, padT=14, padB=26;
+  const n = days.length;
+  const bw = Math.max(4, Math.min(38, (W-padL-padR)/n - 6));
+  const step = (W-padL-padR)/n;
+  const zero = H-padB;
+  const h = (v)=> (Math.abs(v)/max)*(H-padT-padB);
+
+  const jour = (iso)=>{ const [y,m,d]=iso.split("-"); return `${d}/${m}`; };
+
+  return (
+    <div>
+      <div className="row" style={{padding:"0 4px 12px"}}>
+        <Seg value={mode} onChange={setMode} options={MODES}/>
+        <div style={{flex:1}}/>
+        <span style={{color:"var(--mut-2)",fontSize:12.5}}>
+          {n} jour{n>1?"s":""} de relevés
+        </span>
+      </div>
+
+      <div style={{position:"relative"}}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:190,display:"block"}}
+          onMouseLeave={()=>setHover(null)}>
+          <defs>
+            <linearGradient id="bar" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="#833AB4"/><stop offset="70%" stopColor="#E1306C"/>
+              <stop offset="100%" stopColor="#F9A03F"/>
+            </linearGradient>
+          </defs>
+          <line x1={padL} y1={zero} x2={W-padR} y2={zero} stroke="var(--line)" strokeWidth="1"/>
+          {days.map((d,i)=>{
+            const v = d[mode] ?? 0;
+            const x = padL + i*step + (step-bw)/2;
+            const bh = h(v);
+            const y = v>=0 ? zero-bh : zero;
+            const on = hover===i;
+            return (
+              <g key={d.date}>
+                <rect x={padL+i*step} y={padT-8} width={step} height={H-padT-padB+16}
+                  fill={on?"rgba(168,85,247,.10)":"transparent"}
+                  onMouseEnter={()=>setHover(i)} onClick={()=>setHover(on?null:i)} style={{cursor:"pointer"}}/>
+                <rect x={x} y={y} width={bw} height={Math.max(2,bh)} rx={Math.min(5,bw/2)}
+                  fill={d[mode]==null ? "var(--n3)" : (v<0 ? "var(--coral)" : "url(#bar)")}
+                  opacity={hover===null||on?1:.42} style={{pointerEvents:"none"}}/>
+                {(n<=14 || i%Math.ceil(n/12)===0) &&
+                  <text x={padL+i*step+step/2} y={H-8} textAnchor="middle"
+                    fill={on?"var(--txt)":"var(--mut-2)"} fontSize="10.5" style={{pointerEvents:"none"}}>
+                    {jour(d.date)}
+                  </text>}
+              </g>
+            );
+          })}
+        </svg>
+
+        <div style={{
+          minHeight:44, marginTop:4, padding:"10px 14px", borderRadius:12,
+          background:"var(--n2)", border:"1px solid var(--line-soft)",
+          display:"flex", alignItems:"center", gap:14, flexWrap:"wrap"
+        }}>
+          {hover===null
+            ? <span style={{color:"var(--mut-2)",fontSize:13.5}}>
+                Passe la souris sur une barre — ou touche-la — pour voir le détail du jour.
+              </span>
+            : <>
+                <span style={{fontWeight:700,fontSize:14.5}}>{jour(days[hover].date)}</span>
+                <span style={{color:"var(--mut)",fontSize:13.5}}>
+                  {label} : {days[hover][mode]==null
+                    ? <span style={{color:"var(--mut-2)"}}>pas encore mesurable ce jour-là</span>
+                    : <strong style={{color:"var(--txt)"}}>{fmtTxt(days[hover][mode])}</strong>}
+                </span>
+                {days[hover].reels!=null && days[hover].reels>0 && days[hover].reels<=12 &&
+                  <span style={{color:"var(--mut)",fontSize:13.5}}>
+                    {days[hover].reels} reel{days[hover].reels>1?"s":""} publié{days[hover].reels>1?"s":""}
+                  </span>}
+                {mode==="followers" && days[hover].totalFollowers!=null &&
+                  <span style={{color:"var(--mut-2)",fontSize:13}}>
+                    {fmtTxt(days[hover].totalFollowers)} au total ce jour-là
+                  </span>}
+              </>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   RACINE
+   ============================================================ */
+function App(){
+  const [role,setRole] = useState(sessionStorage.getItem("sa_role")||null);
+  const [vaName,setVaName] = useState(sessionStorage.getItem("sa_va")||null);
+  const [settings,setSettings] = useState(null);
+  const [models,setModels] = useState([]);
+  const [accounts,setAccounts] = useState([]);
+  const [snaps,setSnaps] = useState([]);
+  const [vas,setVas] = useState([]);
+  const [refs,setRefs] = useState([]);
+  const [links,setLinks] = useState([]);
+  const [linkStats,setLinkStats] = useState([]);
+  const [countries,setCountries] = useState([]);
+  const [dests,setDests] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [toast,setToast] = useState(null);
+  const say = (m)=>{ setToast(m); setTimeout(()=>setToast(null),3400); };
+
+  async function load(){
+    setLoading(true);
+    if (!db){
+      try{
+        const cfg = await (await fetch("/.netlify/functions/config")).json();
+        if(!cfg.url||!cfg.anonKey){ say("Configuration Supabase manquante dans Netlify"); setLoading(false); return; }
+        db = window.supabase.createClient(cfg.url,cfg.anonKey);
+      }catch{ say("Impossible de charger la configuration"); setLoading(false); return; }
+    }
+    const cols = "account_id,taken_on,followers,following,posts_count,"
+      + "views_7d,reels_7d,likes_7d,comments_7d,views_15d,reels_15d,likes_15d,comments_15d,"
+      + "views_30d,reels_30d,likes_30d,comments_30d,views_total,reels_total,likes_total,comments_total";
+    const [se,mo,ac,sn,va,rf,lk,ls,lc,ld] = await Promise.all([
+      db.from("app_settings").select("data").eq("id",1).single(),
+      db.from("models").select("*").order("name"),
+      db.from("accounts").select("*").order("username"),
+      db.from("snapshots").select(cols).gte("taken_on",daysAgoStr(60)).order("taken_on"),
+      db.from("vas").select("*").order("name"),
+      db.from("ref_accounts").select("*").order("username"),
+      db.from("links").select("*").eq("active",true).order("slug"),
+      db.from("link_stats").select("link_id,taken_on,visits_7d,visits_30d,uniques_7d,uniques_30d,clicks_7d,clicks_30d").gte("taken_on",daysAgoStr(60)).order("taken_on"),
+      db.from("link_countries").select("link_id,taken_on,country,visits").gte("taken_on",daysAgoStr(10)).order("visits",{ascending:false}),
+      db.from("link_destinations").select("link_id,taken_on,window_days,destination,label,clicks,people").gte("taken_on",daysAgoStr(10)).order("people",{ascending:false}),
+    ]);
+    if (se.error||mo.error||ac.error||sn.error) say("Erreur de chargement des données");
+    if (va.error||rf.error) say("Tables VA / références absentes — lance supabase-v2.sql");
+    setSettings(se.data?.data||{}); setModels(mo.data||[]); setAccounts(ac.data||[]);
+    setSnaps(sn.data||[]); setVas(va.data||[]); setRefs(rf.data||[]);
+    setLinks(lk.data||[]); setLinkStats(ls.data||[]); setCountries(lc.data||[]); setDests(ld.data||[]);
+    setLoading(false);
+  }
+  useEffect(()=>{ load(); },[]);
+
+  function enter(pin){
+    if(!settings) return;
+    if(pin===String(settings.admin_pin)){ setRole("admin"); sessionStorage.setItem("sa_role","admin"); }
+    else if(pin===String(settings.va_pin)){ setRole("va"); sessionStorage.setItem("sa_role","va"); }
+    else say("PIN incorrect");
+  }
+  function pick(n){ setVaName(n); sessionStorage.setItem("sa_va",n); }
+  function out(){ setRole(null); setVaName(null); sessionStorage.removeItem("sa_role"); sessionStorage.removeItem("sa_va"); }
+
+  if (loading) return <div className="gate"><div style={{color:"var(--mut)"}}>Chargement…</div></div>;
+  if (!role) return <Gate onEnter={enter}/>;
+  if (role==="va" && !vaName) return <PickVa vas={vas.filter(v=>v.active)} onPick={pick} back={out}/>;
+  const shared = { models, accounts, snaps, vas, refs, links, linkStats, countries, dests, reload:load, say, out, toast };
+  return role==="admin"
+    ? <Admin settings={settings} {...shared}/>
+    : <Va vaName={vaName} {...shared}/>;
+}
+
+function Gate({ onEnter }){
+  const [pin,setPin] = useState("");
+  return (
+    <div className="gate"><div className="gate-box">
+      <h1>Sensual <span className="grad-txt">Aura</span></h1>
+      <p>Entre ton code pour ouvrir le tracker</p>
+      <input type="password" inputMode="numeric" autoFocus value={pin}
+        onChange={e=>setPin(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")onEnter(pin);}}/>
+      <button className="btn" style={{marginTop:14,width:"100%",padding:12}} onClick={()=>onEnter(pin)}>Ouvrir</button>
+    </div></div>
+  );
+}
+function PickVa({ vas, onPick, back }){
+  return (
+    <div className="gate"><div className="gate-box">
+      <h1>Qui travaille ?</h1>
+      <p>Choisis ton prénom pour voir tes comptes</p>
+      {vas.length===0 && <div className="empty">Aucune VA enregistrée. Demande à Awen de t'ajouter.</div>}
+      {vas.map(v=>
+        <button key={v.id} className="btn q" style={{width:"100%",marginBottom:8,padding:13}}
+          onClick={()=>onPick(v.name)}>{v.name}</button>)}
+      <button className="btn q s" style={{marginTop:8}} onClick={back}>Retour</button>
+    </div></div>
+  );
+}
+
+/* ============================================================
+   HÉROS + PALIER
+   ============================================================ */
+function Hero({ views30, views7, views15, dv7, dv30, accounts, tracked }){
+  const t = tierOf(views30);
+  const [w,setW] = useState(0);
+  useEffect(()=>{ const id=setTimeout(()=>setW(t.pct),120); return ()=>clearTimeout(id); },[t.pct]);
+  return (
+    <div className="hero">
+      <div className="hero-in">
+        <div className="hero-main">
+          <div className="hero-label">Vues sur 30 jours · {accounts} compte{accounts>1?"s":""}</div>
+          <div className="hero-num grad-txt"><Num n={views30}/></div>
+          <div className="hero-sub">
+            <Delta n={dv30}/>
+            <span style={{color:"var(--mut-2)"}}>vs les 30 jours précédents</span>
+          </div>
+        </div>
+        <div className="tier">
+          <div className="tier-top">
+            <span className="tier-name">{t.cur.name}</span>
+            {t.next && <span className="tier-goal">vers {fmtGoal(t.next.at)}</span>}
+          </div>
+          <div className="track"><div className="fill" style={{width:w+"%"}}/></div>
+          <div className="tier-msg">{t.cur.msg}</div>
+        </div>
+      </div>
+      <div className="trio">
+        <div className="cell">
+          <div className="cell-l">Vues · 7 jours</div>
+          <div className="cell-v"><Num n={views7}/></div>
+          <div className="cell-d"><Delta n={dv7}/></div>
+        </div>
+        <div className="cell">
+          <div className="cell-l">Vues · 15 jours</div>
+          <div className="cell-v"><Num n={views15}/></div>
+          <div className="cell-d" style={{color:"var(--mut-2)",fontSize:12.5}}>moitié de la fenêtre 30 j</div>
+        </div>
+        <div className="cell">
+          <div className="cell-l">Historique</div>
+          <div className="cell-v"><Num n={tracked}/> <span style={{fontSize:14,color:"var(--mut)"}}>{tracked>1?"jours":"jour"}</span></div>
+          <div className="cell-d" style={{color:"var(--mut-2)",fontSize:12.5}}>
+            {tracked>=30 ? "toutes les comparaisons sont actives" : "les Δ s'activent à 7 puis 30 jours"}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   VUE ADMIN
+   ============================================================ */
+function Admin({ settings, models, accounts, snaps, vas, refs, links, linkStats, countries, dests, reload, say, out, toast }){
+  const [tab,setTab] = useState("dash");
+  const [period,setPeriod] = useState("30d");
+  const [detail,setDetail] = useState(null);
+
+  const live = accounts.filter(a=>a.active);
+  const rows = useMemo(()=>live.map(a=>({a, st:stats(a,snaps)})),[accounts,snaps]);
+  const actifs = rows.filter(r=>r.a.status==="actif");
+  const seuil = Number(settings.seuil_vues||500);
+
+  const totals = useMemo(()=>({
+    count: actifs.length,
+    views7: sumOf(actifs,r=>r.st.per("7d").views),
+    views15: sumOf(actifs,r=>r.st.per("15d").views),
+    views30: sumOf(actifs,r=>r.st.per("30d").views),
+    dv7: sumOf(actifs,r=>r.st.dViews("7d")),
+    dv30: sumOf(actifs,r=>r.st.dViews("30d")),
+    tracked: rows.reduce((m,r)=>Math.max(m,r.st.tracked||0),0),
+  }),[rows]);
+
+  const byModel = useMemo(()=>models.filter(m=>m.active).map(m=>{
+    const g = actifs.filter(r=>r.a.model_id===m.id);
+    const likes = sumOf(g,r=>r.st.per(period).likes)||0;
+    const comments = sumOf(g,r=>r.st.per(period).comments)||0;
+    const reels = sumOf(g,r=>r.st.per(period).reels)||0;
+    const followers = sumOf(g,r=>r.st.latest?.followers);
+    return { m, count:g.length,
+      v7:sumOf(g,r=>r.st.per("7d").views), v30:sumOf(g,r=>r.st.per("30d").views),
+      dv:sumOf(g,r=>r.st.dViews(period)), reels, likes, comments, followers,
+      dFol:sumOf(g,r=>r.st.d7),
+      eng:(followers>0&&reels>0&&(likes||comments))?(((likes+comments)/reels)/followers)*100:null };
+  }).sort((x,y)=>(y.v30||0)-(x.v30||0)),[models,rows,period]);
+
+  const byVa = useMemo(()=>{
+    const names = new Set(actifs.filter(r=>r.a.va_name).map(r=>r.a.va_name));
+    vas.filter(v=>v.active).forEach(v=>names.add(v.name));
+    return [...names].map(name=>{
+      const g = actifs.filter(r=>r.a.va_name===name);
+      return { name, count:g.length,
+        v7:sumOf(g,r=>r.st.per("7d").views), v30:sumOf(g,r=>r.st.per("30d").views),
+        dv:sumOf(g,r=>r.st.dViews(period)),
+        reels:sumOf(g,r=>r.st.per(period).reels), comments:sumOf(g,r=>r.st.per(period).comments),
+        followers:sumOf(g,r=>r.st.latest?.followers), dFol:sumOf(g,r=>r.st.d7),
+        ko: rows.filter(r=>r.a.va_name===name&&(r.a.status==="banni"||r.a.status==="introuvable")).length };
+    }).sort((a,b)=>(b.v7||0)-(a.v7||0));
+  },[rows,vas,period]);
+
+  const orphelins = actifs.filter(r=>!r.a.va_name).length;
+  const sansModele = actifs.filter(r=>!r.a.model_id).length;
+
+  const alerts = useMemo(()=>{
+    const out=[];
+    for(const {a,st} of rows){
+      if(a.status==="restreint") out.push({t:"restreint",a,txt:`Profil restreint par Instagram depuis le ${fmtDate(a.status_changed_on)} : invisible pour les visiteurs non connectés. Aucune statistique lisible de l'extérieur, et une partie du trafic ne peut pas ouvrir le compte.`});
+      if(a.status==="introuvable") out.push({t:"introuvable",a,txt:`Introuvable depuis le ${fmtDate(a.status_changed_on)}. Banni probable — à vérifier sur le téléphone.`});
+      if(a.status==="banni") out.push({t:"banni",a,txt:"Banni. Supprime le container, recrée-en un, puis archive ce compte ici."});
+      if(a.status==="actif" && ageDays(a.started_on)>=14){
+        const m=st.per("30d");
+        if(m.avg!==null && m.avg<seuil)
+          out.push({t:"eval",a,txt:`${plural(ageDays(a.started_on),"jour","jours")}, ${fmtTxt(m.avg)} vues en moyenne par reel (seuil ${fmtTxt(seuil)}). À supprimer et refaire ?`});
+      }
+      if(a.status==="actif" && ageDays(a.started_on)>=7 && st.latest && st.latest.reels_7d===0)
+        out.push({t:"muet",a,txt:"Aucun reel publié depuis 7 jours. Le compte est-il bien traité ?"});
+    }
+    return out;
+  },[rows,seuil]);
+
+  const NAV=[["dash","Tableau de bord"],["classement","Classement"],["comptes","Comptes"],["liens","Liens"],["refs","Comptes à suivre"],
+             ["alertes",`Alertes${alerts.length?` · ${alerts.length}`:""}`],["reglages","Réglages"]];
+
+  return (
+    <div>
+      <div className="bar">
+        <div className="logo"><span className="dot"/>Sensual Aura</div>
+        <div className="nav">
+          {NAV.map(([k,l])=><button key={k} data-on={tab===k?"1":"0"} onClick={()=>setTab(k)}>{l}</button>)}
+        </div>
+        <button className="btn q s" onClick={out}>Quitter</button>
+      </div>
+
+      <div className="wrap">
+        {tab==="dash" && <>
+          <Hero views30={totals.views30} views7={totals.views7} views15={totals.views15}
+            dv7={totals.dv7} dv30={totals.dv30} accounts={totals.count} tracked={totals.tracked}/>
+
+          <div className="panel">
+            <div className="ph">
+              <h2>Par modèle</h2>
+              <div style={{flex:1}}/>
+              <Seg value={period} onChange={setPeriod} options={PERIODS}/>
+            </div>
+            <div className="scroll"><table>
+              <thead><tr>
+                <th>Modèle</th><th className="r">Comptes</th>
+                <th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
+                <th className="r">Δ vues</th><th className="r">Reels</th>
+                <th className="r">Commentaires</th><th className="r">Engagement</th>
+                <th className="r">Abonnés</th><th className="r">Δ abonnés 7 j</th>
+              </tr></thead>
+              <tbody>
+                {byModel.length===0 && <tr><td colSpan="10" className="empty">Ajoute tes modèles dans Réglages.</td></tr>}
+                {byModel.map(r=>
+                  <tr key={r.m.id}>
+                    <td><div className="who">{r.m.name}</div><div className="sub">{r.count} actif{r.count>1?"s":""}</div></td>
+                    <td className="r num">{r.count}</td>
+                    <td className="r"><Num n={r.v7} style={{color:"var(--amber)",fontWeight:700}}/></td>
+                    <td className="r"><Num n={r.v30} style={{fontWeight:700}}/></td>
+                    <td className="r"><Delta n={r.dv}/></td>
+                    <td className="r num">{r.reels ?? "—"}</td>
+                    <td className="r"><Num n={r.comments}/></td>
+                    <td className="r num">{r.eng!=null ? r.eng.toFixed(1).replace(".",",")+" %" : "—"}</td>
+                    <td className="r"><Num n={r.followers}/></td>
+                    <td className="r"><Delta n={r.dFol}/></td>
+                  </tr>)}
+                {sansModele>0 && <tr><td colSpan="10" style={{color:"var(--amber)",fontSize:13}}>
+                  {sansModele} compte(s) actif(s) sans modèle — assigne-les dans l'onglet Comptes.</td></tr>}
+              </tbody>
+            </table></div>
+          </div>
+
+          <div className="panel">
+            <div className="ph"><h2>Par VA</h2><span className="hint">période : {(PERIODS.find(p=>p.key===period)||{}).label}</span></div>
+            <div className="scroll"><table>
+              <thead><tr>
+                <th>VA</th><th className="r">Comptes</th>
+                <th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
+                <th className="r">Δ vues</th><th className="r">Reels</th>
+                <th className="r">Commentaires</th><th className="r">Abonnés</th>
+                <th className="r">Δ abonnés 7 j</th><th className="r">Perdus</th>
+              </tr></thead>
+              <tbody>
+                {byVa.length===0 && <tr><td colSpan="10" className="empty">Ajoute tes VA dans Réglages.</td></tr>}
+                {byVa.map(r=>
+                  <tr key={r.name}>
+                    <td className="who">{r.name}</td>
+                    <td className="r num">{r.count}</td>
+                    <td className="r"><Num n={r.v7} style={{color:"var(--amber)",fontWeight:700}}/></td>
+                    <td className="r"><Num n={r.v30} style={{fontWeight:700}}/></td>
+                    <td className="r"><Delta n={r.dv}/></td>
+                    <td className="r num">{r.reels ?? "—"}</td>
+                    <td className="r"><Num n={r.comments}/></td>
+                    <td className="r"><Num n={r.followers}/></td>
+                    <td className="r"><Delta n={r.dFol}/></td>
+                    <td className="r num" style={{color:r.ko?"var(--coral)":"var(--mut-2)"}}>{r.ko||"—"}</td>
+                  </tr>)}
+                {orphelins>0 && <tr><td colSpan="10" style={{color:"var(--amber)",fontSize:13}}>
+                  {orphelins} compte(s) actif(s) sans VA assignée.</td></tr>}
+              </tbody>
+            </table></div>
+          </div>
+
+          <div className="panel">
+            <div className="ph"><h2>Meilleurs comptes</h2><span className="hint">classés sur 7 jours</span></div>
+            <div className="scroll"><table>
+              <thead><tr>
+                <th>Compte</th><th>Modèle</th><th className="r">Vues 7 j</th>
+                <th className="r">Vues 30 j</th><th className="r">Moyenne par reel</th>
+                <th className="r">Abonnés</th><th className="r">Δ abonnés 7 j</th>
+              </tr></thead>
+              <tbody>
+                {actifs.length===0 && <tr><td colSpan="7" className="empty">Aucun compte actif pour l'instant.</td></tr>}
+                {[...actifs].sort((a,b)=>((b.st.per("7d").views??0)-(a.st.per("7d").views??0))).slice(0,10).map(({a,st})=>
+                  <tr key={a.id} className="tap" onClick={()=>setDetail({a,st})}>
+                    <td className="who">@{a.username}</td>
+                    <td style={{color:"var(--mut)"}}>{models.find(m=>m.id===a.model_id)?.name||"—"}</td>
+                    <td className="r"><Num n={st.per("7d").views} style={{color:"var(--amber)",fontWeight:700}}/></td>
+                    <td className="r"><Num n={st.per("30d").views}/></td>
+                    <td className="r"><Num n={st.per("30d").avg}/></td>
+                    <td className="r"><Num n={st.latest?.followers}/></td>
+                    <td className="r"><Delta n={st.d7}/></td>
+                  </tr>)}
+              </tbody>
+            </table></div>
+          </div>
+        </>}
+
+        {tab==="classement" && <Classement accounts={accounts} snaps={snaps} vas={vas} links={links} linkStats={linkStats} me={null}/>}
+        {tab==="comptes" && <Comptes rows={rows} models={models} vas={vas} open={setDetail} reload={reload} say={say}/>}
+        {tab==="liens" && <Liens links={links} linkStats={linkStats} countries={countries} dests={dests} vas={vas} reload={reload} say={say}/>}
+        {tab==="refs" && <Refs refs={refs} admin reload={reload} say={say}/>}
+        {tab==="alertes" && <Alertes alerts={alerts} open={a=>setDetail({a,st:stats(a,snaps)})}/>}
+        {tab==="reglages" && <Reglages settings={settings} models={models} vas={vas} accounts={accounts} reload={reload} say={say}/>}
+      </div>
+
+      {detail && <Detail data={detail} models={models} vas={vas} snaps={snaps}
+        close={()=>setDetail(null)} reload={reload} say={say}/>}
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+/* ============================================================
+   FORMULAIRE D'AJOUT
+   ============================================================ */
+function AddAccount({ models, vas, onDone, say, fixedVa }){
+  const [u,setU]=useState(""), [mid,setMid]=useState(""), [dev,setDev]=useState("");
+  const [va,setVa]=useState(fixedVa||""), [on,setOn]=useState(todayStr()), [busy,setBusy]=useState(false);
+  async function save(){
+    const name = cleanUsername(u);
+    if(!name){ say("Il manque le nom du compte"); return; }
+    setBusy(true);
+    const { error } = await db.from("accounts").insert({
+      username:name, model_id:mid||null, device_ref:dev||null,
+      va_name:(fixedVa||va)||null, started_on:on });
+    setBusy(false);
+    if(error){ say(error.code==="23505" ? "Ce compte est déjà suivi" : "Erreur : "+error.message); return; }
+    setU(""); setDev(""); say(`@${name} ajouté — il sera relevé cette nuit`); onDone && onDone();
+  }
+  return (
+    <div className="g2">
+      <div className="fld"><label>Nom du compte</label>
+        <input placeholder="@username" value={u} onChange={e=>setU(e.target.value)}
+          onKeyDown={e=>{if(e.key==="Enter")save();}}/></div>
+      <div className="fld"><label>Modèle</label>
+        <select value={mid} onChange={e=>setMid(e.target.value)}>
+          <option value="">à choisir</option>
+          {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+        </select></div>
+      <div className="fld"><label>Téléphone</label>
+        <input placeholder="iPhoneX_01" value={dev} onChange={e=>setDev(e.target.value)}/></div>
+      {!fixedVa && <div className="fld"><label>VA</label>
+        <select value={va} onChange={e=>setVa(e.target.value)}>
+          <option value="">à choisir</option>
+          {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+        </select></div>}
+      <div className="fld"><label>Créé le</label>
+        <input type="date" value={on} onChange={e=>setOn(e.target.value)}/></div>
+      <div className="fld" style={{display:"flex",alignItems:"flex-end"}}>
+        <button className="btn" style={{width:"100%",padding:11}} disabled={busy} onClick={save}>
+          {busy?"…":"Ajouter le compte"}</button></div>
+    </div>
+  );
+}
+
+/* ============================================================
+   ONGLET COMPTES
+   ============================================================ */
+function Comptes({ rows, models, vas, open, reload, say }){
+  const [q,setQ]=useState(""), [fm,setFm]=useState(""), [fv,setFv]=useState(""), [fs,setFs]=useState("");
+  const [add,setAdd]=useState(false);
+  const list = rows.filter(({a})=>{
+    if(q && !a.username.includes(q.toLowerCase().replace("@",""))) return false;
+    if(fm==="none" && a.model_id) return false;
+    if(fm && fm!=="none" && a.model_id!==fm) return false;
+    if(fv==="none" && a.va_name) return false;
+    if(fv && fv!=="none" && a.va_name!==fv) return false;
+    if(fs && a.status!==fs) return false;
+    return true;
+  });
+  const set = async (a,patch)=>{ await db.from("accounts").update(patch).eq("id",a.id); reload(); };
+  return (
+    <div>
+      <div className="row" style={{marginBottom:14}}>
+        <input placeholder="Chercher un compte" value={q} onChange={e=>setQ(e.target.value)} style={{maxWidth:210}}/>
+        <select value={fm} onChange={e=>setFm(e.target.value)} style={{maxWidth:165}}>
+          <option value="">Tous les modèles</option><option value="none">Sans modèle</option>
+          {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+        <select value={fv} onChange={e=>setFv(e.target.value)} style={{maxWidth:150}}>
+          <option value="">Toutes les VA</option><option value="none">Sans VA</option>
+          {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+        </select>
+        <select value={fs} onChange={e=>setFs(e.target.value)} style={{maxWidth:145}}>
+          <option value="">Tous les statuts</option>
+          {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+        </select>
+        <div style={{flex:1}}/>
+        <button className="btn" onClick={()=>setAdd(!add)}>{add?"Fermer":"Ajouter un compte"}</button>
+      </div>
+
+      {add && <div className="panel"><div className="pad">
+        <AddAccount models={models} vas={vas} onDone={reload} say={say}/></div></div>}
+
+      <div className="panel">
+        <div className="ph"><h2>Tous les comptes</h2><span className="hint">{list.length} affiché{list.length>1?"s":""} · clique une ligne pour le détail</span></div>
+        <div className="scroll"><table>
+          <thead><tr>
+            <th>Compte</th><th>Modèle</th><th>VA</th><th>Statut</th>
+            <th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
+            <th className="r">Abonnés</th><th className="r">Δ 7 j</th>
+            <th>Note</th><th className="r">Âge</th>
+          </tr></thead>
+          <tbody>
+            {list.length===0 && <tr><td colSpan="10" className="empty">Aucun compte ne correspond. Change les filtres ou ajoute un compte.</td></tr>}
+            {list.map(({a,st})=>
+              <tr key={a.id} className="tap" onClick={()=>open({a,st})}>
+                <td><div className="who">@{a.username}</div>
+                    {a.device_ref && <div className="sub">{a.device_ref}</div>}</td>
+                <td onClick={e=>e.stopPropagation()}>
+                  <select value={a.model_id||""} onChange={e=>set(a,{model_id:e.target.value||null})}
+                    style={{padding:"6px 9px",fontSize:13,width:130}}>
+                    <option value="">—</option>
+                    {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select></td>
+                <td onClick={e=>e.stopPropagation()}>
+                  <select value={a.va_name||""} onChange={e=>set(a,{va_name:e.target.value||null})}
+                    style={{padding:"6px 9px",fontSize:13,width:120}}>
+                    <option value="">—</option>
+                    {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+                  </select></td>
+                <td><Status a={a}/></td>
+                <td className="r"><Num n={st.per("7d").views} style={{color:"var(--amber)",fontWeight:700}}/></td>
+                <td className="r"><Num n={st.per("30d").views}/></td>
+                <td className="r"><Num n={st.latest?.followers}/></td>
+                <td className="r"><Delta n={st.d7}/></td>
+                <td onClick={e=>e.stopPropagation()}><Stars value={a.rating} onChange={r=>set(a,{rating:r})}/></td>
+                <td className="r num" style={{color:"var(--mut)"}}>{plural(ageDays(a.started_on),"j","j")}</td>
+              </tr>)}
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   COMPTES À SUIVRE (warm-up)
+   ============================================================ */
+function Refs({ refs, admin, reload, say }){
+  const [market,setMarket]=useState("FR");
+  const [u,setU]=useState(""), [lab,setLab]=useState("");
+  const list = refs.filter(r=>r.active && r.market===market);
+  async function add(){
+    const name=cleanUsername(u);
+    if(!name){ say("Il manque le nom du compte"); return; }
+    const { error } = await db.from("ref_accounts").insert({ username:name, market, label:lab||null });
+    if(error){ say(error.code==="23505"?"Déjà dans la liste":"Erreur : "+error.message); return; }
+    setU(""); setLab(""); say("Ajouté à la liste "+market); reload();
+  }
+  async function del(r){
+    if(!confirm(`Retirer @${r.username} de la liste ${r.market} ?`)) return;
+    await db.from("ref_accounts").update({active:false}).eq("id",r.id); say("Retiré"); reload();
+  }
+  return (
+    <div>
+      <div className="row" style={{marginBottom:14}}>
+        <Seg value={market} onChange={setMarket} options={[
+          {key:"FR",label:`France · ${refs.filter(r=>r.active&&r.market==="FR").length}`},
+          {key:"US",label:`États-Unis · ${refs.filter(r=>r.active&&r.market==="US").length}`}]}/>
+      </div>
+      {admin && <div className="panel"><div className="pad">
+        <div className="g2">
+          <div className="fld"><label>Compte à suivre</label>
+            <input placeholder="@username" value={u} onChange={e=>setU(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter")add();}}/></div>
+          <div className="fld"><label>Note</label>
+            <input placeholder="gros compte lingerie" value={lab} onChange={e=>setLab(e.target.value)}/></div>
+        </div>
+        <button className="btn" style={{marginTop:12}} onClick={add}>Ajouter à la liste {market}</button>
+      </div></div>}
+      <div className="panel">
+        <div className="ph"><h2>À suivre pendant le warm-up</h2><span className="hint">marché {market==="FR"?"français":"américain"}</span></div>
+        {list.length===0
+          ? <div className="empty">Rien dans cette liste pour l'instant.{admin?" Ajoute les comptes que les VA doivent suivre.":""}</div>
+          : <div className="scroll"><table>
+              <thead><tr><th>Compte</th><th>Note</th><th className="r"></th></tr></thead>
+              <tbody>{list.map(r=>
+                <tr key={r.id}>
+                  <td className="who"><a href={"https://instagram.com/"+r.username} target="_blank" rel="noreferrer">@{r.username}</a></td>
+                  <td style={{color:"var(--mut)"}}>{r.label||"—"}</td>
+                  <td className="r">{admin && <button className="btn d s" onClick={()=>del(r)}>Retirer</button>}</td>
+                </tr>)}</tbody>
+            </table></div>}
+      </div>
+      <div style={{color:"var(--mut-2)",fontSize:13,padding:"0 4px"}}>
+        À chaque nouveau compte : suis ces profils pendant le warm-up, scrolle leur fil et regarde quelques stories.
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   ALERTES
+   ============================================================ */
+function Alertes({ alerts, open }){
+  const col={restreint:"var(--amber)",introuvable:"var(--amber)",banni:"var(--coral)",eval:"var(--magenta)",muet:"var(--mut)"};
+  if(!alerts.length) return <div className="panel"><div className="empty">
+    Rien à traiter. Tous les comptes tournent normalement.</div></div>;
+  return (
+    <div className="panel">
+      <div className="ph"><h2>À traiter</h2><span className="hint">{alerts.length} point{alerts.length>1?"s":""}</span></div>
+      {alerts.map((al,i)=>
+        <div className="alert" key={i} style={{cursor:"pointer"}} onClick={()=>open(al.a)}>
+          <span className="bead" style={{background:col[al.t]}}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div className="who">@{al.a.username}</div>
+            <div style={{color:"var(--mut)",fontSize:13.5,marginTop:2}}>{al.txt}</div>
+          </div>
+        </div>)}
+    </div>
+  );
+}
+
+/* ============================================================
+   DÉTAIL D'UN COMPTE
+   ============================================================ */
+function Detail({ data, models, vas, snaps, close, reload, say, asVa }){
+  const a = data.a;
+  const st = data.st || stats(a,snaps);
+  const [e,setE] = useState({ model_id:a.model_id||"", device_ref:a.device_ref||"", va_name:a.va_name||"",
+    started_on:a.started_on, status:a.status, notes:a.notes||"" });
+  const t = tierOf(st.per("30d").views);
+
+  async function save(){
+    const patch={...e, model_id:e.model_id||null};
+    if(patch.status!==a.status) patch.status_changed_on=todayStr();
+    const { error } = await db.from("accounts").update(patch).eq("id",a.id);
+    if(error) say("Erreur : "+error.message);
+    else { say("Enregistré"); reload(); close(); }
+  }
+  async function archive(){
+    if(!confirm(`Archiver @${a.username} ? Il sort des listes, les données restent.`)) return;
+    await db.from("accounts").update({active:false,status:"supprime",status_changed_on:todayStr()}).eq("id",a.id);
+    say("Compte archivé"); reload(); close();
+  }
+  return (
+    <div className="ov" onClick={close}>
+      <div className="modal" onClick={ev=>ev.stopPropagation()}>
+        <div className="row" style={{marginBottom:16}}>
+          <h2 style={{fontSize:20,fontWeight:700,flex:1}}>@{a.username}</h2>
+          <a className="btn q s" href={"https://instagram.com/"+a.username} target="_blank" rel="noreferrer">Ouvrir Instagram</a>
+          <button className="btn q s" onClick={close}>Fermer</button>
+        </div>
+
+        <div className="hero" style={{marginBottom:16}}>
+          <div className="hero-in" style={{padding:"20px 20px 16px"}}>
+            <div className="hero-main">
+              <div className="hero-label">Vues sur 30 jours</div>
+              <div className="hero-num grad-txt" style={{fontSize:"clamp(38px,8vw,56px)"}}>
+                <Num n={st.per("30d").views}/></div>
+              <div className="hero-sub"><Delta n={st.dViews("30d")}/>
+                <span style={{color:"var(--mut-2)"}}>{plural(ageDays(a.started_on),"jour d'existence","jours d'existence")}</span></div>
+            </div>
+            <div className="tier">
+              <div className="tier-top"><span className="tier-name">{t.cur.name}</span>
+                {t.next && <span className="tier-goal">vers {fmtGoal(t.next.at)}</span>}</div>
+              <div className="track"><div className="fill" style={{width:t.pct+"%"}}/></div>
+            </div>
+          </div>
+        </div>
+
+        {a.status==="restreint" &&
+          <div className="panel" style={{borderColor:"var(--amber)"}}>
+            <div style={{padding:"15px 18px",fontSize:14}}>
+              <strong style={{color:"var(--amber)"}}>Profil restreint par Instagram.</strong>
+              <div style={{color:"var(--mut)",marginTop:5}}>
+                Le compte est invisible pour les visiteurs non connectés, donc aucune statistique
+                ne peut être relevée de l'extérieur. Tu vois les chiffres dans l'app parce que tu es
+                connecté. Le tracker retente chaque nuit : dès que le compte redevient public,
+                les chiffres reviennent tout seuls.
+              </div>
+            </div>
+          </div>}
+
+        <div className="panel">
+          <div className="ph"><h2>Chiffres par période</h2></div>
+          <div className="scroll"><table style={{minWidth:520}}>
+            <thead><tr><th>Période</th><th className="r">Reels</th><th className="r">Vues</th>
+              <th className="r">Moyenne</th><th className="r">Likes</th>
+              <th className="r">Commentaires</th><th className="r">Engagement</th></tr></thead>
+            <tbody>{PERIODS.map(p=>{ const m=st.per(p.key); return (
+              <tr key={p.key}>
+                <td className="who">{p.label}</td>
+                <td className="r num">{m.reels ?? "—"}</td>
+                <td className="r"><Num n={m.views} style={{fontWeight:700}}/></td>
+                <td className="r"><Num n={m.avg}/></td>
+                <td className="r"><Num n={m.likes}/></td>
+                <td className="r"><Num n={m.comments}/></td>
+                <td className="r num">{m.eng!=null ? m.eng.toFixed(1).replace(".",",")+" %" : "—"}</td>
+              </tr>); })}</tbody>
+          </table></div>
+        </div>
+
+        <div className="panel">
+          <div className="ph"><h2>Jour par jour</h2>
+            <span className="hint">{st.latest?.followers!=null ? fmtTxt(st.latest.followers)+" abonnés aujourd'hui" : ""}</span></div>
+          <div style={{padding:"14px 14px 12px"}}><Journal series={st.series||[]}/></div>
+        </div>
+
+        <div className="g2">
+          <div className="fld"><label>Modèle</label>
+            <select value={e.model_id} onChange={ev=>setE({...e,model_id:ev.target.value})}>
+              <option value="">à choisir</option>
+              {models.filter(m=>m.active).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+            </select></div>
+          <div className="fld"><label>Statut</label>
+            <select value={e.status} onChange={ev=>setE({...e,status:ev.target.value})}>
+              {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+            </select></div>
+          <div className="fld"><label>Téléphone</label>
+            <input value={e.device_ref} onChange={ev=>setE({...e,device_ref:ev.target.value})}/></div>
+          <div className="fld"><label>VA</label>
+            {asVa
+              ? <input value={e.va_name} disabled style={{opacity:.6}}/>
+              : <select value={e.va_name} onChange={ev=>setE({...e,va_name:ev.target.value})}>
+                  <option value="">à choisir</option>
+                  {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+                </select>}</div>
+          <div className="fld"><label>Créé le</label>
+            <input type="date" value={e.started_on} onChange={ev=>setE({...e,started_on:ev.target.value})}/></div>
+          <div className="fld"><label>Notes</label>
+            <input value={e.notes} onChange={ev=>setE({...e,notes:ev.target.value})}/></div>
+        </div>
+
+        <div className="row" style={{marginTop:16}}>
+          <button className="btn" onClick={save}>Enregistrer</button>
+          <div style={{flex:1}}/>
+          {!asVa && <button className="btn d s" onClick={archive}>Archiver</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   RÉGLAGES
+   ============================================================ */
+function Reglages({ settings, models, vas, accounts, reload, say }){
+  const [aPin,setAPin]=useState(String(settings.admin_pin||""));
+  const [vPin,setVPin]=useState(String(settings.va_pin||""));
+  const [seuil,setSeuil]=useState(String(settings.seuil_vues||500));
+  const [nm,setNm]=useState(""), [nv,setNv]=useState("");
+  const [busy,setBusy]=useState(false), [log,setLog]=useState([]);
+
+  useEffect(()=>{ db.from("scan_log").select("*").order("ran_at",{ascending:false}).limit(5)
+    .then(({data})=>setLog(data||[])); },[]);
+
+  async function saveS(){
+    const { error } = await db.from("app_settings")
+      .update({ data:{...settings, admin_pin:aPin, va_pin:vPin, seuil_vues:Number(seuil)||500} }).eq("id",1);
+    if(error) say("Erreur : "+error.message); else { say("Réglages enregistrés"); reload(); }
+  }
+  async function addModel(){ const n=nm.trim(); if(!n)return;
+    const {error}=await db.from("models").insert({name:n});
+    if(error) say(error.code==="23505"?"Ce modèle existe déjà":"Erreur : "+error.message);
+    else { setNm(""); say("Modèle ajouté"); reload(); } }
+  async function addVa(){ const n=nv.trim(); if(!n)return;
+    const {error}=await db.from("vas").insert({name:n});
+    if(error) say(error.code==="23505"?"Cette VA existe déjà":"Erreur : "+error.message);
+    else { setNv(""); say("VA ajoutée"); reload(); } }
+  async function rename(table,row){ const n=prompt("Nouveau nom",row.name); if(!n||!n.trim())return;
+    await db.from(table).update({name:n.trim()}).eq("id",row.id);
+    if(table==="vas") await db.from("accounts").update({va_name:n.trim()}).eq("va_name",row.name);
+    say("Renommé"); reload(); }
+  async function toggle(table,row){ await db.from(table).update({active:!row.active}).eq("id",row.id); reload(); }
+
+  async function scan(){
+    setBusy(true);
+    try{
+      const r = await fetch("/.netlify/functions/scrape-now",{method:"POST",
+        headers:{"Content-Type":"application/json"},body:JSON.stringify({pin:aPin})});
+      const j = await r.json();
+      say(j.ok ? "Relevé lancé — recharge la page dans deux minutes" : "Refusé : "+(j.error||""));
+    }catch{ say("Le serveur ne répond pas"); }
+    setBusy(false);
+  }
+
+  const Line = ({ table, row, count }) => (
+    <div className="row" style={{padding:"9px 0",borderBottom:"1px solid var(--line-soft)"}}>
+      <div style={{flex:1,opacity:row.active?1:.45}}>
+        <span className="who">{row.name}</span>
+        <span style={{color:"var(--mut-2)",fontSize:12.5,marginLeft:8}}>{count} compte{count>1?"s":""}</span>
+      </div>
+      <button className="btn q s" onClick={()=>rename(table,row)}>Renommer</button>
+      <button className="btn q s" onClick={()=>toggle(table,row)}>{row.active?"Désactiver":"Réactiver"}</button>
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="panel">
+        <div className="ph"><h2>Relevé des statistiques</h2></div>
+        <div className="pad">
+          <div className="row">
+            <button className="btn" disabled={busy} onClick={scan}>{busy?"…":"Relever maintenant"}</button>
+            <span style={{color:"var(--mut)",fontSize:13.5}}>
+              Le relevé automatique tourne chaque nuit à 4 h, heure de Bangkok.</span>
+          </div>
+          {log.length>0 && <div style={{marginTop:16}}>
+            {log.map(l=><div key={l.id} className="num" style={{color:"var(--mut-2)",fontSize:13}}>
+              {new Date(l.ran_at).toLocaleString("fr-FR",{timeZone:"Asia/Bangkok"})} — {l.accounts_scanned} comptes, {l.errors} erreur(s)</div>)}
+          </div>}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="ph"><h2>Modèles</h2></div>
+        <div className="pad">
+          <div className="row" style={{marginBottom:10}}>
+            <input placeholder="Nom de la modèle" value={nm} onChange={e=>setNm(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter")addModel();}} style={{maxWidth:230}}/>
+            <button className="btn" onClick={addModel}>Ajouter</button>
+          </div>
+          {models.length===0 && <div className="empty" style={{padding:"14px 0"}}>Aucun modèle pour l'instant.</div>}
+          {models.map(m=><Line key={m.id} table="models" row={m}
+            count={accounts.filter(a=>a.model_id===m.id&&a.active).length}/>)}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="ph"><h2>Assistantes</h2><span className="hint">chacune choisit son prénom en se connectant</span></div>
+        <div className="pad">
+          <div className="row" style={{marginBottom:10}}>
+            <input placeholder="Prénom" value={nv} onChange={e=>setNv(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter")addVa();}} style={{maxWidth:230}}/>
+            <button className="btn" onClick={addVa}>Ajouter</button>
+          </div>
+          {(vas||[]).length===0 && <div className="empty" style={{padding:"14px 0"}}>Aucune VA pour l'instant.</div>}
+          {(vas||[]).map(v=><Line key={v.id} table="vas" row={v}
+            count={accounts.filter(a=>a.va_name===v.name&&a.active).length}/>)}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="ph"><h2>Accès et seuils</h2></div>
+        <div className="pad">
+          <div className="g2">
+            <div className="fld"><label>Ton code</label>
+              <input value={aPin} onChange={e=>setAPin(e.target.value)}/></div>
+            <div className="fld"><label>Code des VA</label>
+              <input value={vPin} onChange={e=>setVPin(e.target.value)}/></div>
+            <div className="fld"><label>Seuil sous lequel un compte est considéré mort (vues par reel)</label>
+              <input type="number" value={seuil} onChange={e=>setSeuil(e.target.value)}/></div>
+          </div>
+          <button className="btn" style={{marginTop:14}} onClick={saveS}>Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   LIENS LINKSCALE
+   ============================================================ */
+function Liens({ links, linkStats, countries, dests, vas, reload, say, fixedVa }){
+  const [period,setPeriod]=useState("30d");
+  const [fv,setFv]=useState("");
+  const [open,setOpen]=useState(null);
+  const suffix = period==="7d" ? "7d" : "30d";
+
+  const base = fixedVa ? (links||[]).filter(l=>l.va_name===fixedVa) : (links||[]);
+  const rows = base.filter(l=>!fv || (fv==="none" ? !l.va_name : l.va_name===fv))
+    .map(l=>({ l, st:lastLinkStat(l.link_id, linkStats||[]) }))
+    .sort((a,b)=>((b.st?.[`visits_${suffix}`]||0)-(a.st?.[`visits_${suffix}`]||0)));
+  const set = async (l,patch)=>{ await db.from("links").update(patch).eq("link_id",l.link_id); reload(); };
+
+  const totV = rows.reduce((t,r)=>t+(r.st?.[`visits_${suffix}`]||0),0);
+  const totC = rows.reduce((t,r)=>t+(r.st?.[`clicks_${suffix}`]||0),0);
+  const totK = rows.reduce((t,r)=>t+(r.st?.[`uniques_${suffix}`]||0),0);
+
+  // destinations du dernier relevé, pour un lien et la fenêtre choisie
+  const destsDe = (linkId) => {
+    const w = period==="7d" ? 7 : 30;
+    const all = (dests||[]).filter(d=>d.link_id===linkId && d.window_days===w);
+    if (all.length===0) return [];
+    const last = all.reduce((m,d)=>d.taken_on>m?d.taken_on:m, all[0].taken_on);
+    return all.filter(d=>d.taken_on===last).sort((a,b)=>b.people-a.people);
+  };
+
+  // pays du dernier relevé, pour un lien
+  const paysDe = (linkId) => {
+    const all = (countries||[]).filter(c=>c.link_id===linkId);
+    if (all.length===0) return [];
+    const last = all.reduce((m,c)=>c.taken_on>m?c.taken_on:m, all[0].taken_on);
+    const day = all.filter(c=>c.taken_on===last);
+    const tot = day.reduce((t,c)=>t+c.visits,0) || 1;
+    return day.sort((a,b)=>b.visits-a.visits).map(c=>({...c, pct:(c.visits/tot)*100}));
+  };
+
+  return (
+    <div>
+      <div className="row" style={{marginBottom:14}}>
+        <Seg value={period} onChange={setPeriod} options={[{key:"7d",label:"7 jours"},{key:"30d",label:"30 jours"}]}/>
+        {!fixedVa &&
+          <select value={fv} onChange={e=>setFv(e.target.value)} style={{maxWidth:170}}>
+            <option value="">Toutes les VA</option><option value="none">Sans VA</option>
+            {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+          </select>}
+        <div style={{flex:1}}/>
+        <span style={{color:"var(--mut)",fontSize:13.5}}>
+          {rows.length} lien{rows.length>1?"s":""} · {fmtTxt(totV)} vues · {fmtTxt(totK)} ont cliqué {totV>0 ? `(${((totK/totV)*100).toFixed(0)} %)` : ""}
+        </span>
+      </div>
+
+      <div className="panel">
+        <div className="ph"><h2>Liens suivis</h2>
+          <span className="hint">clique une ligne pour voir les pays</span></div>
+        {rows.length===0
+          ? <div className="empty">
+              {fixedVa
+                ? "Aucun lien à ton nom pour l'instant. Awen t'en attribuera depuis son écran."
+                : "Aucun lien suivi. Range tes liens dans des dossiers LinkScale, puis lance un relevé."}
+            </div>
+          : <div className="scroll"><table>
+              <thead><tr>
+                <th style={{width:30}}></th><th>Dossier</th>{!fixedVa && <th>VA</th>}
+                <th className="r">Vues du lien</th><th className="r">Ont cliqué</th>
+                <th className="r">Telegram</th><th className="r">MYM</th>
+                <th className="r">Taux de clic</th>
+              </tr></thead>
+              <tbody>{rows.map(({l,st})=>{
+                const v=st?.[`visits_${suffix}`] ?? null;
+                const c=st?.[`clicks_${suffix}`] ?? null;
+                const direct = l.kind==="direct";
+                const conv = st?.[`uniques_${suffix}`] ?? null;   // visiteurs ayant cliqué
+                const dd = destsDe(l.link_id);
+                const ctr=(!direct && v>0 && conv!=null) ? (conv/v)*100 : null;
+                const isOpen = open===l.link_id;
+                const pays = isOpen ? paysDe(l.link_id) : [];
+                return (
+                  <React.Fragment key={l.link_id}>
+                    <tr className="tap" onClick={()=>setOpen(isOpen?null:l.link_id)}>
+                      <td style={{color:"var(--mut-2)",fontSize:12}}>{isOpen?"▾":"▸"}</td>
+                      <td>
+                        <div className="who">{l.folder_name || "Sans dossier"}</div>
+                        <div className="sub">
+                          {l.domain ? `${l.domain}/${l.slug||""}` : (l.slug||l.link_id)}
+                          {direct && " · lien direct"}
+                        </div>
+                      </td>
+                      {!fixedVa &&
+                        <td onClick={e=>e.stopPropagation()}>
+                          <select value={l.va_name||""} onChange={e=>set(l,{va_name:e.target.value||null})}
+                            style={{padding:"6px 9px",fontSize:13,width:130}}>
+                            <option value="">—</option>
+                            {(vas||[]).filter(v=>v.active).map(v=><option key={v.id} value={v.name}>{v.name}</option>)}
+                          </select></td>}
+                      <td className="r"><Num n={v} style={{fontWeight:700}}/></td>
+                      <td className="r">{direct
+                        ? <span style={{color:"var(--mut-2)",fontSize:12.5}}>redirection</span>
+                        : <Num n={conv} style={{color:"var(--violet)",fontWeight:700}}/>}</td>
+                      <td className="r">{direct ? <span style={{color:"var(--mut-2)"}}>—</span>
+                        : <Num n={(dd.find(x=>x.destination==="telegram")||{}).people}
+                            style={{color:"#2AABEE",fontWeight:700}}/>}</td>
+                      <td className="r">{direct ? <span style={{color:"var(--mut-2)"}}>—</span>
+                        : <Num n={(dd.find(x=>x.destination==="mym")||{}).people}
+                            style={{color:"#E1306C",fontWeight:700}}/>}</td>
+                      <td className="r num" style={{fontWeight:600,
+                        color: ctr!=null ? (ctr>=25?"var(--mint)":ctr>=12?"var(--txt)":"var(--amber)") : "var(--mut-2)"}}>
+                        {ctr!=null ? ctr.toFixed(1).replace(".",",")+" %" : "—"}</td>
+                    </tr>
+                    {isOpen &&
+                      <tr><td colSpan={fixedVa?7:8} style={{background:"var(--n0)",padding:"18px 20px"}}>
+                        {dd.length>0 &&
+                          <div style={{marginBottom:20}}>
+                            <div style={{color:"var(--mut)",fontSize:12.5,marginBottom:10}}>
+                              Où partent les visiteurs
+                            </div>
+                            {dd.map(d=>{
+                              const part = conv>0 ? (d.people/conv)*100 : null;
+                              return (
+                                <div key={d.destination} style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+                                  <div style={{width:130,fontSize:13.5,fontWeight:700,color:destColor(d.destination)}}>
+                                    {d.label}</div>
+                                  <div style={{flex:1,height:8,borderRadius:99,background:"var(--n3)",overflow:"hidden",maxWidth:340}}>
+                                    <div style={{width:(part!=null?Math.min(100,part):0)+"%",height:"100%",
+                                      borderRadius:99,background:destColor(d.destination)}}/>
+                                  </div>
+                                  <div className="num" style={{width:120,textAlign:"right",fontWeight:700}}>
+                                    {d.people} personne{d.people>1?"s":""}</div>
+                                  <div className="num" style={{width:78,textAlign:"right",color:"var(--mut-2)",fontSize:13}}>
+                                    {d.clicks} clic{d.clicks>1?"s":""}</div>
+                                </div>
+                              );
+                            })}
+                          </div>}
+
+                        {pays.length===0
+                          ? <div style={{color:"var(--mut-2)",fontSize:13.5}}>
+                              {dd.length>0 ? "Les pays arrivent au prochain relevé." : "Pas encore de données pour ce lien. Elles arrivent au prochain relevé."}
+                            </div>
+                          : <div>
+                              <div style={{color:"var(--mut)",fontSize:12.5,marginBottom:10}}>
+                                D'où viennent les visiteurs, sur 30 jours
+                                {(() => {
+                                  const analysees = pays.reduce((t,c)=>t+c.visits,0);
+                                  if (v == null || analysees >= v) return null;
+                                  return <span style={{color:"var(--amber)"}}>
+                                    {" "}· calculé sur {analysees} visites analysées sur {v}
+                                  </span>;
+                                })()}
+                              </div>
+                              {pays.map(c=>
+                                <div key={c.country} style={{display:"flex",alignItems:"center",gap:12,marginBottom:7}}>
+                                  <div style={{width:130,fontSize:13.5,fontWeight:600}}>{paysNom(c.country)}</div>
+                                  <div style={{flex:1,height:7,borderRadius:99,background:"var(--n3)",overflow:"hidden",maxWidth:340}}>
+                                    <div style={{width:c.pct+"%",height:"100%",borderRadius:99,
+                                      background:c.country==="FR"||c.country==="US" ? "var(--grad)" : "var(--violet)"}}/>
+                                  </div>
+                                  <div className="num" style={{width:56,textAlign:"right",fontWeight:700}}>
+                                    {c.pct.toFixed(1).replace(".",",")} %</div>
+                                  <div className="num" style={{width:52,textAlign:"right",color:"var(--mut-2)",fontSize:13}}>
+                                    {c.visits}</div>
+                                </div>)}
+                            </div>}
+                      </td></tr>}
+                  </React.Fragment>
+                );
+              })}</tbody>
+            </table></div>}
+      </div>
+      <div style={{color:"var(--mut-2)",fontSize:13,padding:"0 4px"}}>
+        {fixedVa
+          ? "Ce sont les liens qui te sont attribués. Clique une ligne pour voir d'où viennent les visiteurs."
+          : "Seuls les liens rangés dans un dossier LinkScale sont suivis. Si le dossier porte le prénom d'une VA, le rattachement se fait tout seul — rien à redéployer quand tu ajoutes quelqu'un."}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   CLASSEMENT DES VA — visible par tout le monde
+   Totaux uniquement : jamais le détail des comptes des autres.
+   ============================================================ */
+function Classement({ accounts, snaps, vas, links, linkStats, me }){
+  const [period,setPeriod] = useState("30d");
+  const rows = useMemo(()=>{
+    const live = accounts.filter(a=>a.active && a.status==="actif" && a.va_name);
+    const withSt = live.map(a=>({a, st:stats(a,snaps)}));
+    const names = new Set(withSt.map(r=>r.a.va_name));
+    (vas||[]).filter(v=>v.active).forEach(v=>names.add(v.name));
+    return [...names].map(name=>{
+      const g = withSt.filter(r=>r.a.va_name===name);
+      const likes = sumOf(g,r=>r.st.per(period).likes)||0;
+      const comments = sumOf(g,r=>r.st.per(period).comments)||0;
+      const reels = sumOf(g,r=>r.st.per(period).reels)||0;
+      const followers = sumOf(g,r=>r.st.latest?.followers);
+      const myLinks = (links||[]).filter(l=>l.va_name===name);
+      const cl = clicksOf(myLinks, linkStats||[], period==="7d"?"7d":"30d");
+      return { name, count:g.length, nbLinks:myLinks.length,
+        clicks:cl.clicks, visits:cl.visits, uniques:cl.uniques,
+        v7:sumOf(g,r=>r.st.per("7d").views),
+        v15:sumOf(g,r=>r.st.per("15d").views),
+        v30:sumOf(g,r=>r.st.per("30d").views),
+        views:sumOf(g,r=>r.st.per(period).views),
+        comments, reels, followers,
+        dFol:sumOf(g,r=>r.st.d7),
+        eng:(followers>0 && reels>0 && (likes||comments))
+          ? (((likes+comments)/reels)/followers)*100 : null };
+    }).sort((a,b)=>(b.v30||0)-(a.v30||0));
+  },[accounts,snaps,vas,period]);
+
+  const total = sumOf(rows,r=>r.v30);
+  const mine = rows.find(r=>r.name===me);
+  const rank = mine ? rows.indexOf(mine)+1 : null;
+
+  return (
+    <div>
+      {me && rank && rows.length>1 &&
+        <div className="hero" style={{marginBottom:16}}>
+          <div className="hero-in" style={{padding:"22px 24px 20px"}}>
+            <div className="hero-main">
+              <div className="hero-label">Ta place ce mois-ci</div>
+              <div className="hero-num grad-txt" style={{fontSize:"clamp(40px,8vw,64px)"}}>
+                {rank}<span className="unit" style={{fontSize:".4em"}}>
+                  {rank===1?"re":"e"} sur {rows.length}</span></div>
+              <div className="hero-sub">
+                <span style={{color:"var(--mut-2)"}}>
+                  {rank===1
+                    ? "Tu es en tête. Garde le rythme."
+                    : `${fmtTxt((rows[rank-2].v30||0)-(mine.v30||0))} vues te séparent de la place au-dessus.`}
+                </span>
+              </div>
+            </div>
+            <div className="tier">
+              <div className="tier-top">
+                <span className="tier-name">Tes vues sur 30 jours</span>
+                <span className="tier-goal">{fmtTxt(mine.v30)}</span>
+              </div>
+              <div className="track">
+                <div className="fill" style={{width:(total>0?Math.min(100,((mine.v30||0)/total)*100):0)+"%"}}/>
+              </div>
+              <div className="tier-msg">
+                {total>0 ? `${Math.round(((mine.v30||0)/total)*100)} % des vues de l'équipe` : "En attente du premier relevé"}
+              </div>
+            </div>
+          </div>
+        </div>}
+
+      <div className="panel">
+        <div className="ph">
+          <h2>Classement de l'équipe</h2>
+          <div style={{flex:1}}/>
+          <Seg value={period} onChange={setPeriod} options={PERIODS.filter(p=>p.key!=="total")}/>
+        </div>
+        <div className="scroll"><table>
+          <thead><tr>
+            <th style={{width:44}}></th><th>VA</th><th className="r">Comptes</th>
+            <th className="r">Vues 7 j</th><th className="r">Vues 15 j</th><th className="r">Vues 30 j</th>
+            <th className="r">Reels</th><th className="r">Commentaires</th>
+            <th className="r">Engagement</th><th className="r">Vues liens</th>
+            <th className="r">Abonnés</th><th className="r">Δ abonnés 7 j</th>
+          </tr></thead>
+          <tbody>
+            {rows.length===0 && <tr><td colSpan="12" className="empty">
+              Le classement apparaîtra dès que des comptes seront assignés.</td></tr>}
+            {rows.map((r,i)=>{
+              const isMe = r.name===me;
+              return (
+                <tr key={r.name} style={isMe?{background:"rgba(168,85,247,.09)"}:undefined}>
+                  <td className="num" style={{color:i===0?"var(--amber)":"var(--mut-2)",fontWeight:700}}>{i+1}</td>
+                  <td>
+                    <span className="who">{r.name}</span>
+                    {isMe && <span className="chip c-actif" style={{marginLeft:8}}>toi</span>}
+                    <div className="sub">{r.count} compte{r.count>1?"s":""}</div>
+                  </td>
+                  <td className="r num">{r.count}</td>
+                  <td className="r"><Num n={r.v7} style={{color:"var(--amber)",fontWeight:700}}/></td>
+                  <td className="r"><Num n={r.v15}/></td>
+                  <td className="r"><Num n={r.v30} style={{fontWeight:700}}/></td>
+                  <td className="r num">{r.reels ?? "—"}</td>
+                  <td className="r"><Num n={r.comments}/></td>
+                  <td className="r num">{r.eng!=null ? r.eng.toFixed(1).replace(".",",")+" %" : "—"}</td>
+                  <td className="r"><Num n={r.visits ?? r.clicks} style={{color:"var(--violet)",fontWeight:700}}/></td>
+                  <td className="r"><Num n={r.followers}/></td>
+                  <td className="r"><Delta n={r.dFol}/></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table></div>
+      </div>
+      <div style={{color:"var(--mut-2)",fontSize:13,padding:"0 4px"}}>
+        Chiffres cumulés par personne. Le détail des comptes reste privé à chacun.
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   VUE VA
+   ============================================================ */
+function Va({ models, accounts, snaps, refs, vas, links, linkStats, countries, dests, vaName, reload, say, out, toast }){
+  const [tab,setTab]=useState("mes");
+  const [detail,setDetail]=useState(null);
+  const mine = accounts.filter(a=>a.active && a.status!=="supprime" && a.va_name===vaName);
+  const rows = useMemo(()=>mine.map(a=>({a,st:stats(a,snaps)})),[accounts,snaps,vaName]);
+  const actifs = rows.filter(r=>r.a.status==="actif");
+  const tot = {
+    count:actifs.length,
+    views7:sumOf(actifs,r=>r.st.per("7d").views),
+    views15:sumOf(actifs,r=>r.st.per("15d").views),
+    views30:sumOf(actifs,r=>r.st.per("30d").views),
+    dv7:sumOf(actifs,r=>r.st.dViews("7d")),
+    dv30:sumOf(actifs,r=>r.st.dViews("30d")),
+    tracked:rows.reduce((m,r)=>Math.max(m,r.st.tracked||0),0),
+  };
+  const groups = useMemo(()=>{
+    const map={};
+    for(const r of rows){
+      const m=models.find(x=>x.id===r.a.model_id);
+      const k=m?m.name:"Sans modèle";
+      (map[k]=map[k]||[]).push(r);
+    }
+    return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0]));
+  },[rows,models]);
+
+  const mesLiens = useMemo(()=>(links||[]).filter(l=>l.va_name===vaName)
+    .map(l=>({ l, st:lastLinkStat(l.link_id, linkStats||[]) }))
+    .sort((a,b)=>((b.st?.visits_30d||0)-(a.st?.visits_30d||0))),[links,linkStats,vaName]);
+
+  async function banni(a){
+    if(!confirm(`Signaler @${a.username} comme banni ?`)) return;
+    const { error } = await db.from("accounts").update({status:"banni",status_changed_on:todayStr()}).eq("id",a.id);
+    if(error) say("Erreur : "+error.message); else { say("Signalé. Awen validera la suppression."); reload(); }
+  }
+
+  return (
+    <div>
+      <div className="bar">
+        <div className="logo"><span className="dot"/>{vaName}</div>
+        <div className="nav">
+          <button data-on={tab==="mes"?"1":"0"} onClick={()=>setTab("mes")}>Mes comptes</button>
+          <button data-on={tab==="liens"?"1":"0"} onClick={()=>setTab("liens")}>Mes liens</button>
+          <button data-on={tab==="classement"?"1":"0"} onClick={()=>setTab("classement")}>Classement</button>
+          <button data-on={tab==="refs"?"1":"0"} onClick={()=>setTab("refs")}>Comptes à suivre</button>
+        </div>
+        <button className="btn q s" onClick={out}>Quitter</button>
+      </div>
+
+      <div className="wrap">
+        {tab==="refs" && <Refs refs={refs} admin={false} reload={reload} say={say}/>}
+        {tab==="classement" && <Classement accounts={accounts} snaps={snaps} vas={vas} links={links} linkStats={linkStats} me={vaName}/>}
+        {tab==="liens" && <Liens links={links} linkStats={linkStats} countries={countries} dests={dests} vas={vas} reload={reload} say={say} fixedVa={vaName}/>}
+
+        {tab==="mes" && <>
+          <Hero views30={tot.views30} views7={tot.views7} views15={tot.views15}
+            dv7={tot.dv7} dv30={tot.dv30} accounts={tot.count} tracked={tot.tracked}/>
+
+          {mesLiens.length>0 &&
+            <div className="panel">
+              <div className="ph"><h2>Mes liens</h2>
+                <span className="hint">clique pour le détail par pays dans l'onglet Mes liens</span></div>
+              <div className="scroll"><table style={{minWidth:520}}>
+                <thead><tr><th>Dossier</th><th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
+                  <th className="r">Ont cliqué</th><th className="r">Taux de clic</th></tr></thead>
+                <tbody>{mesLiens.map(({l,st})=>{
+                  const direct = l.kind==="direct";
+                  const v=st?.visits_30d ?? null, conv=st?.uniques_30d ?? null;
+                  const ctr=(!direct && v>0 && conv!=null) ? (conv/v)*100 : null;
+                  return (
+                    <tr key={l.link_id} className="tap" onClick={()=>setTab("liens")}>
+                      <td><div className="who">{l.folder_name||"—"}</div>
+                          <div className="sub">{l.domain ? `${l.domain}/${l.slug||""}` : l.slug}{direct && " · lien direct"}</div></td>
+                      <td className="r"><Num n={st?.visits_7d} style={{color:"var(--amber)",fontWeight:700}}/></td>
+                      <td className="r"><Num n={v} style={{fontWeight:700}}/></td>
+                      <td className="r">{direct
+                        ? <span style={{color:"var(--mut-2)",fontSize:12.5}}>redirection</span>
+                        : <Num n={conv} style={{color:"var(--violet)",fontWeight:700}}/>}</td>
+                      <td className="r num" style={{fontWeight:600,
+                        color: ctr!=null ? (ctr>=25?"var(--mint)":ctr>=12?"var(--txt)":"var(--amber)") : "var(--mut-2)"}}>
+                        {ctr!=null ? ctr.toFixed(1).replace(".",",")+" %" : "—"}</td>
+                    </tr>);
+                })}</tbody>
+              </table></div>
+            </div>}
+
+          <div className="panel">
+            <div className="ph"><h2>Ajouter un compte</h2><span className="hint">à chaque nouveau compte créé</span></div>
+            <div className="pad"><AddAccount models={models} onDone={reload} say={say} fixedVa={vaName}/></div>
+          </div>
+
+          {groups.length===0 && <div className="panel"><div className="empty">
+            Aucun compte à ton nom. Ajoute le premier ci-dessus.</div></div>}
+
+          {groups.map(([name,list])=>
+            <div className="panel" key={name}>
+              <div className="ph"><h2>{name}</h2><span className="hint">{list.length} compte{list.length>1?"s":""}</span></div>
+              <div className="scroll"><table>
+                <thead><tr><th>Compte</th><th>Statut</th>
+                  <th className="r">Vues 7 j</th><th className="r">Vues 30 j</th>
+                  <th className="r">Abonnés</th><th className="r">Δ 7 j</th><th className="r"></th></tr></thead>
+                <tbody>{list.map(({a,st})=>
+                  <tr key={a.id} className="tap" onClick={()=>setDetail({a,st})}>
+                    <td><div className="who"><a href={"https://instagram.com/"+a.username} target="_blank" rel="noreferrer"
+                          onClick={ev=>ev.stopPropagation()}>@{a.username}</a></div>
+                        {a.device_ref && <div className="sub">{a.device_ref}</div>}</td>
+                    <td><Status a={a}/></td>
+                    <td className="r"><Num n={st.per("7d").views} style={{color:"var(--amber)",fontWeight:700}}/></td>
+                    <td className="r"><Num n={st.per("30d").views}/></td>
+                    <td className="r"><Num n={st.latest?.followers}/></td>
+                    <td className="r"><Delta n={st.d7}/></td>
+                    <td className="r" onClick={ev=>ev.stopPropagation()}>{a.status==="actif" &&
+                      <button className="btn d s" onClick={()=>banni(a)}>Signaler banni</button>}</td>
+                  </tr>)}</tbody>
+              </table></div>
+            </div>)}
+        </>}
+      </div>
+      {detail && <Detail data={detail} models={models} vas={vas} snaps={snaps} asVa
+        close={()=>setDetail(null)} reload={reload} say={say}/>}
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+// Filet de sécurité : une erreur d'affichage montre un message au lieu d'un écran noir
+class ErrorBoundary extends React.Component{
+  constructor(p){ super(p); this.state={ err:null }; }
+  static getDerivedStateFromError(err){ return { err }; }
+  componentDidCatch(err, info){ console.error("Tracker — erreur d'affichage :", err, info); }
+  render(){
+    if(!this.state.err) return this.props.children;
+    return (
+      <div className="gate"><div className="gate-box">
+        <h1>Oups</h1>
+        <p>Une erreur a bloqué l'affichage. Envoie une capture de ce message à Awen.</p>
+        <pre style={{whiteSpace:"pre-wrap",fontSize:12,color:"var(--coral)",textAlign:"left",
+          background:"var(--n2)",padding:12,borderRadius:10,margin:"12px 0"}}>{String(this.state.err?.message||this.state.err)}</pre>
+        <button className="btn" style={{width:"100%",padding:12}} onClick={()=>location.reload()}>Recharger</button>
+        <button className="btn q s" style={{marginTop:8}} onClick={()=>{ try{ sessionStorage.clear(); }catch{} location.reload(); }}>Revenir à l'écran du code</button>
+      </div></div>
+    );
+  }
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<ErrorBoundary><App/></ErrorBoundary>);
+
+</script>
+</body>
+</html>
