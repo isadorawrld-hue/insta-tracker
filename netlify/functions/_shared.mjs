@@ -289,6 +289,65 @@ export async function fetchInstagramReels(handle, userId) {
   };
 }
 
+// ---------- Secours : endpoint POSTS (v2) ----------
+// Les comptes récents sont souvent renvoyés sans aucun reel par
+// /user/reels (Instagram ne les marque pas encore "has_clips").
+// L'endpoint /v2/instagram/user/posts, lui, renvoie bien leurs vidéos
+// avec play_count. On ne s'en sert QUE si l'appel reels est revenu vide.
+function isVideoItem(raw) {
+  const m = raw?.media || raw?.node || raw || {};
+  if (m.media_type === 2 || raw?.media_type === 2) return true;
+  const pt = String(m.product_type || raw?.product_type || "").toLowerCase();
+  if (pt === "clips" || pt === "igtv" || pt === "reels") return true;
+  return num(m.play_count) !== null || num(m.ig_play_count) !== null ||
+         num(raw?.play_count) !== null || num(raw?.ig_play_count) !== null;
+}
+
+export async function fetchInstagramPosts(handle) {
+  const base = "https://api.scrapecreators.com/v2/instagram/user/posts";
+  const cutoff = Date.now() / 1000 - 35 * 86400;
+  const MAX_PAGES = 6;
+  const all = [];
+  let nextMaxId = null;
+  let ok = false;
+  let pages = 0;
+
+  for (let i = 0; i < MAX_PAGES; i++) {
+    const url = `${base}?handle=${encodeURIComponent(handle)}` +
+      (nextMaxId ? `&next_max_id=${encodeURIComponent(nextMaxId)}` : "");
+    let json = null;
+    try {
+      const res = await fetch(url, { headers: { "x-api-key": SC_KEY } });
+      const text = await res.text();
+      try { json = JSON.parse(text); } catch { /* ignore */ }
+      if (!res.ok) break;
+    } catch { break; }
+    if (!json) break;
+    ok = true;
+    pages += 1;
+
+    const items = (Array.isArray(json.items) && json.items) ||
+                  (Array.isArray(json?.data?.items) && json.data.items) || [];
+    if (items.length === 0) break;
+    all.push(...items.filter(isVideoItem));
+
+    const oldest = items.reduce((min, it) => {
+      const t = itemTs(it);
+      return (t !== null && (min === null || t < min)) ? t : min;
+    }, null);
+    if (oldest !== null && oldest < cutoff) break;
+
+    const next = json.next_max_id ?? json?.data?.next_max_id ?? null;
+    const more = json.more_available ?? json?.data?.more_available;
+    if (more === false || !next || String(next) === String(nextMaxId)) break;
+    nextMaxId = String(next);
+
+    await new Promise((r) => setTimeout(r, 150));
+  }
+
+  return { ok, pages, json: ok ? { items: all, _pages: pages, _source: "posts" } : null };
+}
+
 // Extrait l'id utilisateur de la réponse profil (pour accélérer l'appel reels)
 export function extractUserId(json) {
   const u = json?.data?.user || json?.user || json?.data || json || {};
@@ -443,7 +502,16 @@ export async function runScan() {
           // Les vues ne sont PAS dans /profile : on interroge l'endpoint reels
           const userId = extractUserId(r.json);
           const rl = await fetchInstagramReels(acc.username, userId);
-          const ag = rl.ok && rl.json ? aggregateReels(rl.json) : null;
+          let src = rl;
+          let ag = rl.ok && rl.json ? aggregateReels(rl.json) : null;
+
+          // Rien côté /user/reels (typique des comptes récents) :
+          // on retente avec l'endpoint posts, qui porte aussi les vues.
+          if (!ag || ag.items_seen === 0) {
+            const po = await fetchInstagramPosts(acc.username);
+            const agp = po.ok && po.json ? aggregateReels(po.json) : null;
+            if (agp && agp.items_seen > 0) { ag = agp; src = po; }
+          }
           const useReels = !!(ag && ag.items_seen > 0);
 
           await sbUpsert(
@@ -475,7 +543,7 @@ export async function runScan() {
               likes_total:    useReels ? ag.total.likes    : null,
               comments_total: useReels ? ag.total.comments : null,
 
-              raw: { profile: r.json, reels: rl.json || null },
+              raw: { profile: r.json, reels: src.json || null },
             }],
             "account_id,taken_on"
           );
@@ -563,125 +631,6 @@ async function lsTool(name, args) {
   return null;
 }
 
-// La réponse utile est dans stats.summary :
-//   totalClicks = trafic total, uniqueUsers = visiteurs uniques,
-//   bots / spam = trafic filtré.
-function summaryOf(r) {
-  const sum = r?.stats?.summary || r?.summary || r?.data?.stats?.summary || null;
-  if (!sum) return null;
-  const n = (x) => (typeof x === "number" ? x : (typeof x === "string" && /^\d+$/.test(x) ? Number(x) : null));
-  return {
-    visits: n(sum.totalClicks) ?? n(sum.total_clicks) ?? n(sum.visits),
-    uniques: n(sum.uniqueUsers) ?? n(sum.unique_users) ?? n(sum.uniqueUsersNormal),
-    humans: n(sum.uniqueUsersNormal),
-    bots: n(sum.bots),
-    spam: n(sum.spam),
-  };
-}
-
-const isoAt = (d) => new Date(Date.now() - d * 86400000).toISOString();
-
-// Une fenêtre. Au-delà d'une dizaine de jours la réponse dépasse la limite
-// de transport MCP (9 000 caractères) et LinkScale la tronque : on découpe
-// alors en tranches courtes et on additionne.
-async function statsRange(linkId, fromDays, toDays) {
-  const r = await lsTool("get_link_stats", {
-    link_id: linkId,
-    from: isoAt(fromDays),
-    to: toDays === 0 ? new Date().toISOString() : isoAt(toDays),
-  });
-  const truncated = !!(r && r.truncated_for_transport);
-  return { sum: summaryOf(r), truncated, raw: r };
-}
-
-async function statsWindow(linkId, days) {
-  // tentative directe
-  const direct = await statsRange(linkId, days, 0);
-  if (direct.sum && !direct.truncated) {
-    return { ...direct.sum, chunks: 1, raw: direct.raw };
-  }
-  // découpage en tranches de 6 jours
-  const step = 6;
-  let visits = 0, humans = 0, bots = 0, got = false, chunks = 0;
-  for (let from = days; from > 0; from -= step) {
-    const to = Math.max(0, from - step);
-    const part = await statsRange(linkId, from, to);
-    chunks += 1;
-    if (part.sum) {
-      if (part.sum.visits != null) { visits += part.sum.visits; got = true; }
-      if (part.sum.humans != null) humans += part.sum.humans;
-      if (part.sum.bots != null) bots += part.sum.bots;
-    }
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  return got
-    // les visiteurs uniques ne s'additionnent pas entre tranches : on ne les invente pas
-    ? { visits, uniques: null, humans, bots, chunks, raw: { chunked: true, chunks } }
-    : { visits: null, uniques: null, humans: null, bots: null, chunks, raw: direct.raw };
-}
-
-// Tout vient des logs de visites : chaque ligne porte le pays de la visite
-// et la liste des clics effectués dessus. Une seule source, donc des chiffres
-// cohérents entre eux (vues, clics et pays partagent le même dénominateur).
-async function visitLogs(linkId, days, maxPages = 12) {
-  const from = isoAt(days);
-  const to = new Date().toISOString();
-  const rows = [];
-  let cursor = null, lastId = null, truncated = false;
-
-  for (let p = 0; p < maxPages; p++) {
-    const args = { link_id: linkId, source: "visits", from, to, limit: 100, visitor_type: "humans" };
-    if (cursor) args.next_cursor = cursor;
-    if (lastId) args.last_id = lastId;
-
-    const r = await lsTool("get_link_logs", args);
-    const page = Array.isArray(r?.data) ? r.data
-      : Array.isArray(r?.logs) ? r.logs
-      : Array.isArray(r?.entries) ? r.entries
-      : Array.isArray(r) ? r : [];
-    if (page.length === 0) break;
-    rows.push(...page);
-
-    const more = r?.has_more === true;
-    const np = r?.next_page || {};
-    const nc = np.next_cursor || r?.next_cursor || null;
-    const li = np.last_id || r?.last_id || null;
-    if (!more || !nc || nc === cursor) break;
-    cursor = nc; lastId = li;
-
-    if (p === maxPages - 1) truncated = true;
-    await new Promise((x) => setTimeout(x, 90));
-  }
-  return { rows, truncated };
-}
-
-// Les logs de clics portent clicked_url : on en déduit la destination.
-async function clickLogs(linkId, days, maxPages = 12) {
-  const from = isoAt(days);
-  const to = new Date().toISOString();
-  const rows = [];
-  let cursor = null, lastId = null;
-
-  for (let p = 0; p < maxPages; p++) {
-    const args = { link_id: linkId, source: "clicks", from, to, limit: 100 };
-    if (cursor) args.next_cursor = cursor;
-    if (lastId) args.last_id = lastId;
-
-    const r = await lsTool("get_link_logs", args);
-    const page = Array.isArray(r?.data) ? r.data : [];
-    if (page.length === 0) break;
-    rows.push(...page);
-
-    const more = r?.has_more === true;
-    const np = r?.next_page || {};
-    const nc = np.next_cursor || r?.next_cursor || null;
-    if (!more || !nc || nc === cursor) break;
-    cursor = nc; lastId = np.last_id || r?.last_id || null;
-    await new Promise((x) => setTimeout(x, 90));
-  }
-  return rows;
-}
-
 // Reconnaître la destination à partir de l'URL cliquée
 function destinationOf(url) {
   const u = String(url || "").toLowerCase();
@@ -700,45 +649,64 @@ function destinationOf(url) {
   } catch { return { key: "autre", label: "Autre" }; }
 }
 
-// Regroupe les clics par destination, en comptant aussi les personnes
-function destinations(rows) {
-  const map = new Map();
-  for (const r of rows) {
-    if (r?.spam === 1 || r?.blocked === 1 || r?.bot === true) continue;
-    const d = destinationOf(r.clicked_url);
-    const visiteur = r.stats_id || r.stats_mongo_id || r.mongo_id || r._id;
-    if (!map.has(d.key)) map.set(d.key, { key: d.key, label: d.label, clicks: 0, people: new Set() });
-    const e = map.get(d.key);
-    e.clicks += 1;
-    if (visiteur) e.people.add(String(visiteur));
-    // un libellé plus précis l'emporte sur "Autre"
-    if (e.label === "Autre" && d.label !== "Autre") e.label = d.label;
-  }
-  return [...map.values()]
-    .map((e) => ({ key: e.key, label: e.label, clicks: e.clicks, people: e.people.size }))
-    .sort((a, b) => b.people - a.people || b.clicks - a.clicks);
+/* ---------- Relevé par lien : les outils "résumé" de LinkScale ----------
+   get_link_stats renvoie toutes ses listes et dépasse systématiquement la
+   limite de 9 000 caractères du transport MCP : la réponse revient alors
+   vidée de ses totaux. Et parcourir les logs page par page est illusoire —
+   LinkScale les sert par toutes petites pages, on s'arrêtait à ~60 visites
+   sur des milliers. On utilise donc les outils prévus pour ça, qui répondent
+   en un appel et restent sous la limite :
+     summarize_link_performance → visites, clics, pays, boutons
+     get_ctr_report (unique_clicks) → nombre de personnes ayant cliqué     */
+
+function summarize(r) {
+  const a = r?.analytics || {};
+  const n = (x) => (typeof x === "number" && Number.isFinite(x) ? x : null);
+  if (!r || (a.visits == null && a.total_button_clicks == null)) return null;
+  return {
+    visits: n(a.visits),
+    bots: n(a.bots),
+    humans: n(a.unique_visitors_human) ?? n(a.unique_visitors),
+    clicks: n(a.total_button_clicks),
+    buttons: Array.isArray(r.top_buttons) ? r.top_buttons : [],
+    countries: Array.isArray(r.top_countries) ? r.top_countries : [],
+  };
 }
 
-// Vues, clics et pays, calculés en une passe sur les mêmes visites
-function digest(rows) {
-  let visits = 0, clicks = 0, convertis = 0;
-  const tally = new Map();
-  for (const r of rows) {
-    if (r?.spam === 1 || r?.blocked === 1) continue; // trafic filtré
-    visits += 1;
+async function linkSummary(linkId, days) {
+  return summarize(await lsTool("summarize_link_performance", { link_id: linkId, days }));
+}
 
-    const cl = Array.isArray(r.clicks) ? r.clicks.length : 0;
-    clicks += cl;
-    if (cl > 0) convertis += 1;
+// Personnes ayant cliqué + taux de clic, calcul du tableau de bord.
+// Les liens directs n'ont pas de page, donc pas de CTR : l'outil les exclut.
+async function linkCtr(linkId, days) {
+  const r = await lsTool("get_ctr_report", {
+    link_id: linkId, days, ctr_mode: "unique_clicks", min_visitors: 0, limit: 5,
+  });
+  const row = (Array.isArray(r?.links) ? r.links : []).find((x) => x?.link_id === linkId)
+    || (Array.isArray(r?.links) && r.links.length === 1 ? r.links[0] : null)
+    || r?.project || null;
+  if (!row) return { clickers: null, ctr: null };
+  const n = (x) => (typeof x === "number" && Number.isFinite(x) ? x : null);
+  return {
+    clickers: n(row.unique_clickers),
+    ctr: n(row.ctr_pct) ?? n(row.weighted_avg_ctr_pct),
+  };
+}
 
-    const c = String(r.country || "").toUpperCase().trim();
-    if (c && c.length <= 3) tally.set(c, (tally.get(c) || 0) + 1);
+// Les boutons portent leur URL : on regroupe par destination (Telegram, MYM…)
+function destinationsFromButtons(buttons) {
+  const map = new Map();
+  for (const b of buttons || []) {
+    const clicks = Number(b?.clicks);
+    if (!Number.isFinite(clicks)) continue;
+    const d = destinationOf(b.url);
+    if (!map.has(d.key)) map.set(d.key, { key: d.key, label: d.label, clicks: 0 });
+    const e = map.get(d.key);
+    e.clicks += clicks;
+    if (e.label === "Autre" && d.label !== "Autre") e.label = d.label;
   }
-  const pays = [...tally.entries()]
-    .map(([country, v]) => ({ country, visits: v }))
-    .sort((a, b) => b.visits - a.visits)
-    .slice(0, 15);
-  return { visits, clicks, convertis, pays };
+  return [...map.values()].sort((a, b) => b.clicks - a.clicks);
 }
 
 export async function syncLinkScale() {
@@ -810,42 +778,56 @@ export async function syncLinkScale() {
     }
   }
 
-  // 5. Relevé : tout depuis les logs, une seule source
-  const actifs = (await sbSelect("links?select=link_id&active=eq.true&enabled=eq.true")) || [];
-  let done = 0, errors = 0;
+  // 5. Relevé par lien, via les outils de résumé (aucun parcours de logs)
+  const actifs = (await sbSelect("links?select=link_id,kind&active=eq.true&enabled=eq.true")) || [];
+  let done = 0, errors = 0, vides = 0;
   for (const l of actifs.slice(0, 120)) {
     try {
-      const l7 = await visitLogs(l.link_id, 7, 6);
-      const l30 = await visitLogs(l.link_id, 30, 12);
-      const d7 = digest(l7.rows);
-      const d30 = digest(l30.rows);
+      const s7 = await linkSummary(l.link_id, 7);
+      const s30 = await linkSummary(l.link_id, 30);
+      if (!s7 && !s30) { vides += 1; continue; }
+
+      // un lien direct redirige sans page : pas de bouton, donc pas de CTR
+      const direct = l.kind === "direct";
+      const c7 = direct ? { clickers: null, ctr: null } : await linkCtr(l.link_id, 7);
+      const c30 = direct ? { clickers: null, ctr: null } : await linkCtr(l.link_id, 30);
 
       await sbUpsert("link_stats", [{
         link_id: l.link_id, taken_on: today,
-        visits_7d: d7.visits, visits_30d: d30.visits,
-        // "uniques" porte ici le nombre de visiteurs ayant cliqué au moins une fois
-        uniques_7d: d7.convertis, uniques_30d: d30.convertis,
-        clicks_7d: d7.clicks, clicks_30d: d30.clicks,
-        sampled: l30.truncated,
-        raw: { pages7: l7.rows.length, pages30: l30.rows.length, tronque: l30.truncated },
+        visits_7d: s7?.visits ?? null, visits_30d: s30?.visits ?? null,
+        // "uniques" porte le nombre de personnes ayant cliqué au moins une fois
+        uniques_7d: c7.clickers, uniques_30d: c30.clickers,
+        clicks_7d: s7?.clicks ?? null, clicks_30d: s30?.clicks ?? null,
+        sampled: false,   // plus d'échantillon : ce sont les totaux de LinkScale
+        raw: {
+          source: "summarize_link_performance + get_ctr_report",
+          bots_7d: s7?.bots ?? null, bots_30d: s30?.bots ?? null,
+          humains_7d: s7?.humans ?? null, humains_30d: s30?.humans ?? null,
+          ctr_7d: c7.ctr, ctr_30d: c30.ctr,
+        },
       }], "link_id,taken_on");
 
-      // destinations des clics, sur les deux fenêtres
-      for (const [days, maxP] of [[7, 6], [30, 12]]) {
-        const cl = await clickLogs(l.link_id, days, maxP);
-        const dest = destinations(cl);
+      // destinations des clics, par fenêtre
+      for (const [days, sum] of [[7, s7], [30, s30]]) {
+        const dest = destinationsFromButtons(sum?.buttons);
         if (dest.length) {
           await sbUpsert("link_destinations",
             dest.map((d) => ({
               link_id: l.link_id, taken_on: today, window_days: days,
-              destination: d.key, label: d.label, clicks: d.clicks, people: d.people,
+              destination: d.key, label: d.label, clicks: d.clicks,
+              // LinkScale donne les clics par bouton, pas le nombre de personnes
+              people: null,
             })), "link_id,taken_on,window_days,destination");
         }
       }
 
-      if (d30.pays.length) {
+      const pays = (s30?.countries || []).filter((c) => c?.country && Number.isFinite(Number(c.visits)));
+      if (pays.length) {
         await sbUpsert("link_countries",
-          d30.pays.map((c) => ({ link_id: l.link_id, taken_on: today, country: c.country, visits: c.visits })),
+          pays.map((c) => ({
+            link_id: l.link_id, taken_on: today,
+            country: String(c.country).toUpperCase().slice(0, 3), visits: Number(c.visits),
+          })),
           "link_id,taken_on,country");
       }
 
@@ -853,5 +835,5 @@ export async function syncLinkScale() {
       await new Promise((r) => setTimeout(r, 110));
     } catch (e) { errors += 1; console.error("LinkScale", l.link_id, e.message); }
   }
-  return { dossiers: folders.length, links: rows.length, releves: done, errors };
+  return { dossiers: folders.length, links: rows.length, releves: done, vides, errors };
 }
