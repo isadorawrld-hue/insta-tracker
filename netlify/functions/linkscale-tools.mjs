@@ -108,6 +108,38 @@ export default async (req) => {
     });
   }
 
+  // Mode "schemas" : nom, description et paramètres acceptés par chaque outil.
+  // C'est ce qui permet de savoir comment demander un résultat compact.
+  if (tool === "schemas") {
+    const r = await mcp("tools/list");
+    const tools = r?.json?.result?.tools || [];
+    // plusieurs filtres séparés par des virgules
+    const filtres = (url.searchParams.get("filtre") || "")
+      .toLowerCase().split(",").map((x) => x.trim()).filter(Boolean);
+    out = tools
+      .filter((t) => filtres.length === 0 ||
+        filtres.some((f) => String(t.name).toLowerCase().includes(f)))
+      .map((t) => {
+        const sch = t.inputSchema || t.input_schema || {};
+        const props = sch.properties || {};
+        return {
+          nom: t.name,
+          description: String(t.description || "").slice(0, 400),
+          requis: sch.required || [],
+          parametres: Object.fromEntries(
+            Object.entries(props).slice(0, 40).map(([k, v]) => [
+              k,
+              [v?.type || "?", v?.enum ? `valeurs: ${v.enum.join("|")}` : "",
+               String(v?.description || "").slice(0, 160)].filter(Boolean).join(" — "),
+            ])
+          ),
+        };
+      });
+    return new Response(JSON.stringify(out, null, 2), {
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    });
+  }
+
   if (!tool) {
     const r = await mcp("tools/list");
     out = { outils: (r?.json?.result?.tools || []).map((t) => t.name) };
