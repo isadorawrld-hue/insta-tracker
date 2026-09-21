@@ -533,7 +533,7 @@ function App(){
       db.from("links").select("*").eq("active",true).order("slug"),
       db.from("link_stats").select("link_id,taken_on,visits_7d,visits_30d,uniques_7d,uniques_30d,clicks_7d,clicks_30d").gte("taken_on",daysAgoStr(60)).order("taken_on"),
       db.from("link_countries").select("link_id,taken_on,country,visits").gte("taken_on",daysAgoStr(10)).order("visits",{ascending:false}),
-      db.from("link_destinations").select("link_id,taken_on,window_days,destination,label,clicks,people").gte("taken_on",daysAgoStr(10)).order("people",{ascending:false}),
+      db.from("link_destinations").select("link_id,taken_on,window_days,destination,label,clicks,people").gte("taken_on",daysAgoStr(10)).order("clicks",{ascending:false}),
     ]);
     if (se.error||mo.error||ac.error||sn.error) say("Erreur de chargement des données");
     if (va.error||rf.error) say("Tables VA / références absentes — lance supabase-v2.sql");
@@ -1040,21 +1040,54 @@ function Alertes({ alerts, open }){
 function Detail({ data, models, vas, snaps, close, reload, say, asVa }){
   const a = data.a;
   const st = data.st || stats(a,snaps);
-  const [e,setE] = useState({ model_id:a.model_id||"", device_ref:a.device_ref||"", va_name:a.va_name||"",
-    started_on:a.started_on, status:a.status, notes:a.notes||"" });
+  const [e,setE] = useState({ username:a.username, model_id:a.model_id||"", device_ref:a.device_ref||"",
+    va_name:a.va_name||"", started_on:a.started_on, status:a.status, notes:a.notes||"" });
+  const [busy,setBusy] = useState(false);
   const t = tierOf(st.per("30d").views);
 
   async function save(){
-    const patch={...e, model_id:e.model_id||null};
-    if(patch.status!==a.status) patch.status_changed_on=todayStr();
+    const pseudo = cleanUsername(e.username || "");
+    if(!pseudo){ say("Le pseudo ne peut pas être vide"); return; }
+
+    const change = pseudo !== a.username;
+    // Changer le pseudo, c'est suivre un autre compte Instagram :
+    // les relevés de l'ancien pseudo ne veulent plus rien dire.
+    if(change && !confirm(
+      `Le pseudo passe de @${a.username} à @${pseudo}.\n\n` +
+      `Les relevés faits sous l'ancien pseudo seront supprimés, et le compte ` +
+      `repassera en "Actif" — le prochain relevé repartira de zéro.`)) return;
+
+    setBusy(true);
+    const patch={...e, username:pseudo, model_id:e.model_id||null};
+    if(change){ patch.status="actif"; patch.status_changed_on=todayStr(); }
+    else if(patch.status!==a.status) patch.status_changed_on=todayStr();
+
     const { error } = await db.from("accounts").update(patch).eq("id",a.id);
-    if(error) say("Erreur : "+error.message);
-    else { say("Enregistré"); reload(); close(); }
+    setBusy(false);
+    if(error){
+      say(/duplicate|unique/i.test(error.message)
+        ? `@${pseudo} est déjà suivi — vérifie la liste des comptes`
+        : "Erreur : "+error.message);
+      return;
+    }
+    if(change) await db.from("snapshots").delete().eq("account_id",a.id);
+    say(change ? `Pseudo corrigé : @${pseudo}` : "Enregistré");
+    reload(); close();
   }
   async function archive(){
     if(!confirm(`Archiver @${a.username} ? Il sort des listes, les données restent.`)) return;
     await db.from("accounts").update({active:false,status:"supprime",status_changed_on:todayStr()}).eq("id",a.id);
     say("Compte archivé"); reload(); close();
+  }
+  // Suppression définitive : la ligne et tous ses relevés disparaissent.
+  async function supprimer(){
+    if(!confirm(`Supprimer définitivement @${a.username} ?\n\nLe compte et tous ses relevés seront effacés. C'est irréversible.`)) return;
+    if(!confirm(`Dernière confirmation : on efface @${a.username}.`)) return;
+    setBusy(true);
+    const { error } = await db.from("accounts").delete().eq("id",a.id);
+    setBusy(false);
+    if(error) say("Erreur : "+error.message);
+    else { say(`@${a.username} supprimé`); reload(); close(); }
   }
   return (
     <div className="ov" onClick={close}>
@@ -1121,6 +1154,12 @@ function Detail({ data, models, vas, snaps, close, reload, say, asVa }){
         </div>
 
         <div className="g2">
+          <div className="fld" style={{gridColumn:"1 / -1"}}><label>Pseudo Instagram</label>
+            <input value={e.username} placeholder="sans le @"
+              onChange={ev=>setE({...e,username:ev.target.value})}/>
+            <div style={{color:"var(--mut-2)",fontSize:12,marginTop:5}}>
+              À corriger en cas de faute de frappe. Les relevés de l'ancien pseudo seront effacés.
+            </div></div>
           <div className="fld"><label>Modèle</label>
             <select value={e.model_id} onChange={ev=>setE({...e,model_id:ev.target.value})}>
               <option value="">à choisir</option>
@@ -1146,9 +1185,10 @@ function Detail({ data, models, vas, snaps, close, reload, say, asVa }){
         </div>
 
         <div className="row" style={{marginTop:16}}>
-          <button className="btn" onClick={save}>Enregistrer</button>
+          <button className="btn" onClick={save} disabled={busy}>{busy ? "…" : "Enregistrer"}</button>
           <div style={{flex:1}}/>
-          {!asVa && <button className="btn d s" onClick={archive}>Archiver</button>}
+          {!asVa && <button className="btn d s" onClick={archive} disabled={busy}>Archiver</button>}
+          <button className="btn d s" onClick={supprimer} disabled={busy}>Supprimer</button>
         </div>
       </div>
     </div>
@@ -1297,7 +1337,7 @@ function Liens({ links, linkStats, countries, dests, vas, reload, say, fixedVa }
     const all = (dests||[]).filter(d=>d.link_id===linkId && d.window_days===w);
     if (all.length===0) return [];
     const last = all.reduce((m,d)=>d.taken_on>m?d.taken_on:m, all[0].taken_on);
-    return all.filter(d=>d.taken_on===last).sort((a,b)=>b.people-a.people);
+    return all.filter(d=>d.taken_on===last).sort((a,b)=>b.clicks-a.clicks);
   };
 
   // pays du dernier relevé, pour un lien
@@ -1338,7 +1378,7 @@ function Liens({ links, linkStats, countries, dests, vas, reload, say, fixedVa }
               <thead><tr>
                 <th style={{width:30}}></th><th>Dossier</th>{!fixedVa && <th>VA</th>}
                 <th className="r">Vues du lien</th><th className="r">Ont cliqué</th>
-                <th className="r">Telegram</th><th className="r">MYM</th>
+                <th className="r">Telegram<div style={{fontWeight:400,color:"var(--mut-2)",fontSize:10.5}}>clics</div></th><th className="r">MYM<div style={{fontWeight:400,color:"var(--mut-2)",fontSize:10.5}}>clics</div></th>
                 <th className="r">Taux de clic</th>
               </tr></thead>
               <tbody>{rows.map(({l,st})=>{
@@ -1373,10 +1413,10 @@ function Liens({ links, linkStats, countries, dests, vas, reload, say, fixedVa }
                         ? <span style={{color:"var(--mut-2)",fontSize:12.5}}>redirection</span>
                         : <Num n={conv} style={{color:"var(--violet)",fontWeight:700}}/>}</td>
                       <td className="r">{direct ? <span style={{color:"var(--mut-2)"}}>—</span>
-                        : <Num n={(dd.find(x=>x.destination==="telegram")||{}).people}
+                        : <Num n={(dd.find(x=>x.destination==="telegram")||{}).clicks}
                             style={{color:"#2AABEE",fontWeight:700}}/>}</td>
                       <td className="r">{direct ? <span style={{color:"var(--mut-2)"}}>—</span>
-                        : <Num n={(dd.find(x=>x.destination==="mym")||{}).people}
+                        : <Num n={(dd.find(x=>x.destination==="mym")||{}).clicks}
                             style={{color:"#E1306C",fontWeight:700}}/>}</td>
                       <td className="r num" style={{fontWeight:600,
                         color: ctr!=null ? (ctr>=25?"var(--mint)":ctr>=12?"var(--txt)":"var(--amber)") : "var(--mut-2)"}}>
@@ -1390,7 +1430,8 @@ function Liens({ links, linkStats, countries, dests, vas, reload, say, fixedVa }
                               Où partent les visiteurs
                             </div>
                             {dd.map(d=>{
-                              const part = conv>0 ? (d.people/conv)*100 : null;
+                              const totalClics = dd.reduce((t,x)=>t+(x.clicks||0),0);
+                              const part = totalClics>0 ? (d.clicks/totalClics)*100 : null;
                               return (
                                 <div key={d.destination} style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
                                   <div style={{width:130,fontSize:13.5,fontWeight:700,color:destColor(d.destination)}}>
@@ -1400,9 +1441,9 @@ function Liens({ links, linkStats, countries, dests, vas, reload, say, fixedVa }
                                       borderRadius:99,background:destColor(d.destination)}}/>
                                   </div>
                                   <div className="num" style={{width:120,textAlign:"right",fontWeight:700}}>
-                                    {d.people} personne{d.people>1?"s":""}</div>
-                                  <div className="num" style={{width:78,textAlign:"right",color:"var(--mut-2)",fontSize:13}}>
                                     {d.clicks} clic{d.clicks>1?"s":""}</div>
+                                  <div className="num" style={{width:78,textAlign:"right",color:"var(--mut-2)",fontSize:13}}>
+                                    {part!=null ? part.toFixed(0)+" %" : "—"}</div>
                                 </div>
                               );
                             })}
